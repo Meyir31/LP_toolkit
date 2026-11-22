@@ -1,0 +1,154 @@
+/* LP Toolkit: ArcGIS Pro style shell. Tabbed ribbon, Contents pane (left), map views, docked Project / Tools pane (right),
+   status bar; light and dark themes (html[data-theme]). Loaded after app.css: overrides its layout and colours. */
+:root, html[data-theme="light"] {
+  --bg: #e9ebee; --panel: #fbfbfc; --panel2: #f0f2f5; --ribbon: #ffffff; --appbar: #f7f8fa; --ink: #1f2328; --muted: #5f6670; --line: #d6dae0;
+  --accent: #1a73b8; --accent-ink: #ffffff; --hover: #e4eef8; --on: #cde2f5; --input: #ffffff; --shadow: 0 4px 14px rgba(0,0,0,.18);
+  --ok-bg: #e8f5e9; --run-bg: #fff4e5; --bad-bg: #fdecea; --note-bg: #fff8e1; --icon: #37474F;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  --bg: #1b1b1c; --panel: #2b2b2d; --panel2: #333336; --ribbon: #2f2f31; --appbar: #252527; --ink: #e6e7e9; --muted: #a3a9b1; --line: #46484d;
+  --accent: #3a9be0; --accent-ink: #ffffff; --hover: #3a3e45; --on: #1f4766; --input: #1f1f21; --shadow: 0 4px 16px rgba(0,0,0,.55);
+  --ok-bg: rgba(67,160,71,.22); --run-bg: rgba(245,161,66,.2); --bad-bg: rgba(229,57,53,.2); --note-bg: rgba(255,202,40,.12); --icon: #cfd8dc;
+  color-scheme: dark;
+}
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-size: 13px; }
+
+/* ---------------- app bar ---------------- */
+header.appbar { height: 42px; flex: none; background: var(--appbar); color: var(--ink); border-bottom: 1px solid var(--line); padding: 0 10px; }
+.appbar .brand { display: flex; align-items: center; gap: 8px; font-size: 15px; } .appbar .brand span { color: var(--muted); opacity: 1; font-size: 12px; margin-left: 2px; }
+.appbar .logo { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 5px; background: linear-gradient(135deg, #1a73b8, #43a047); color: #fff; font-size: 11px; font-weight: 700; margin: 0; }
+.appbar .proj { gap: 6px; } .appbar .proj select { min-width: 240px; padding: 4px 8px; }
+header.appbar button, header.appbar button.ghost { color: var(--ink); border-color: var(--line); background: transparent; padding: 4px 10px; font-size: 12.5px; }
+header.appbar button:hover { background: var(--hover); }
+header.appbar button.icon { width: 32px; padding: 4px 0; text-align: center; font-size: 15px; line-height: 1; }
+
+/* ---------------- ribbon tabs + ribbon ---------------- */
+.rtabs { flex: none; display: flex; gap: 2px; padding: 0 10px; background: var(--appbar); border-bottom: 1px solid var(--line); height: 30px; align-items: flex-end; }
+.rtabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--ink); padding: 5px 12px; font-size: 13px; }
+.rtabs button:hover { background: var(--hover); }
+.rtabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.rtabs button[hidden] { display: none; }
+.ribbonhost { flex: none; background: var(--ribbon); border-bottom: 1px solid var(--line); }
+.ribbonhost.collapsed .ribbon { display: none !important; }
+.ribbonhost .ribbon { position: static !important; inset: auto !important; margin: 0; box-shadow: none; border: 0; border-radius: 0; background: transparent; color: var(--ink);
+  display: flex; flex-wrap: nowrap; align-items: stretch; gap: 0; padding: 4px 6px 2px; min-height: 88px; overflow-x: auto; overflow-y: hidden; }
+.ribbonhost .ribbon .grp { display: flex; flex-direction: column; justify-content: space-between; align-items: center; gap: 2px; padding: 0 8px; border-right: 1px solid var(--line); flex: none; }
+.ribbonhost .ribbon .grp.rt-off { display: none !important; }
+.ribbonhost .ribbon .gb { display: flex; align-items: flex-start; gap: 1px; flex-wrap: nowrap; }
+.ribbonhost .ribbon .gl { margin: 2px 0 0; font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.ribbonhost .ribbon button { background: transparent; color: var(--ink); border: 1px solid transparent; min-width: 52px; padding: 4px 5px; font-size: 11.5px; border-radius: 3px; gap: 3px; }
+.ribbonhost .ribbon button svg { width: 26px; height: 26px; color: var(--accent); }
+.ribbonhost .ribbon button:hover { background: var(--hover); border-color: var(--line); }
+.ribbonhost .ribbon button.on { background: var(--on); border-color: var(--accent); color: var(--ink); }
+.ribbonhost .ribbon button:disabled { opacity: .45; cursor: default; }
+.ribbonhost .ribbon .rhide, .ribtab { display: none !important; }
+.ribbonhost .ribbon .fl select, .ribbonhost .ribbon .stack select { font-size: 12px; padding: 2px 4px; max-width: 170px; }
+.ribbonhost .ribbon .stack { display: flex; flex-direction: column; gap: 2px; justify-content: center; }
+.ribbonhost .ribbon .stack button { flex-direction: row; min-width: 0; justify-content: flex-start; gap: 6px; padding: 2px 8px; }
+.ribbonhost .ribbon .stack button svg { width: 18px; height: 18px; }
+.ribbonhost .ribbon .stack label { display: flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 1px 4px; white-space: nowrap; }
+.rcollapse { margin-left: auto; align-self: center; background: transparent !important; border: 0 !important; color: var(--muted) !important; min-width: 0 !important; padding: 2px 6px !important; }
+html[data-theme="dark"] svg[stroke="#37474F"], html[data-theme="dark"] svg [stroke="#37474F"] { stroke: var(--icon); }
+html[data-theme="dark"] svg [fill="#fff"] { fill: #e8eaed; }
+
+/* ---------------- main area: Contents | map | dock ---------------- */
+main.shell { flex: 1; display: flex; min-height: 0; height: auto; }
+.dockpane { background: var(--panel); color: var(--ink); display: flex; flex-direction: column; min-height: 0; flex: none; }
+#contents { width: var(--lw, 290px); border-right: 1px solid var(--line); }
+#rdock { width: var(--rw, 390px); border-left: 1px solid var(--line); }
+.split { width: 5px; flex: none; cursor: col-resize; background: var(--bg); }
+.split:hover, .split.drag { background: var(--accent); }
+body.nocontents #contents, body.nocontents .split[data-split=contents] { display: none; }
+body.nopanel #rdock, body.nopanel .split[data-split=rdock] { display: none; }
+body.nopanel #panel { display: block; }
+.dh { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px 6px; font-size: 15px; }
+.dh b { font-weight: 600; }
+.dx { background: transparent !important; border: 0 !important; color: var(--muted) !important; font-size: 18px; line-height: 1; padding: 0 4px !important; }
+.dx:hover { color: var(--ink) !important; }
+.dsearch { padding: 0 10px 6px; } .dsearch input { width: 100%; padding: 4px 8px; }
+.db { flex: 1; overflow: auto; padding: 0 10px 20px; }
+.dsec { font-size: 13px; font-weight: 600; margin: 10px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+#ctLayers .lrow { padding: 2px 0; border-radius: 3px; } #ctLayers .lrow:hover { background: var(--hover); }
+#ctLayers label { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 12.5px; cursor: pointer; }
+#ctLayers .opw input[type=range] { width: 64px; }
+#ctLegend { font-size: 12px; } #ctLegend details > span { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+#ctLegend i { width: 14px; height: 11px; border: 1px solid #555; display: inline-block; flex: none; }
+.mapwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+.viewtabs { flex: none; display: flex; align-items: flex-end; gap: 2px; height: 28px; padding: 0 6px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+.viewtabs .vt { background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 4px 4px 0 0; color: var(--ink); padding: 3px 14px; font-size: 12.5px; }
+.viewtabs .vt.on { background: var(--panel); border-color: var(--line); border-top: 2px solid var(--accent); font-weight: 600; }
+.viewtabs .vtitle { margin-left: auto; align-self: center; color: var(--muted); font-size: 12px; padding-right: 6px; }
+.mapwrap #map { flex: 1; min-height: 0; }
+#rdock .dtabs { display: flex; align-items: flex-end; gap: 2px; padding: 4px 8px 0; border-bottom: 1px solid var(--line); flex: none; }
+#rdock .dtabs button { background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 12px; font-size: 14px; }
+#rdock .dtabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+#rdock .dtabs .sp { flex: 1; }
+#toolCount { display: inline-block; min-width: 16px; font-size: 10.5px; background: var(--accent); color: #fff; border-radius: 8px; padding: 0 5px; margin-left: 3px; }
+#toolCount:empty { display: none; }
+#rdock #panel { width: auto; min-width: 0; flex: 1; border: 0; background: transparent; padding: 10px 12px 40px; overflow-y: auto; }
+#toolDock { flex: 1; overflow: auto; padding: 8px 10px 30px; }
+#toolDock .widget, #toolDock .pane { position: static !important; inset: auto !important; left: auto !important; top: auto !important; right: auto !important;
+  width: auto !important; max-height: none !important; box-shadow: none !important; margin: 0 0 10px; z-index: auto; border-radius: 4px; }
+#toolDock .widget .wh { cursor: default; }
+#toolDock .pane .pb { max-height: none; }
+
+/* ---------------- status bar ---------------- */
+footer.statusbar { flex: none; height: 26px; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: var(--appbar); border-top: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+.statusbar select { padding: 1px 4px; font-size: 12px; height: 20px; }
+.statusbar .sp { flex: 1; } .statusbar .sbi { white-space: nowrap; color: var(--muted); }
+.statusbar .sbi.warn { color: #e68a00; font-weight: 600; } .statusbar .sbi.run { color: var(--accent); font-weight: 600; }
+
+/* ---------------- themed components (light keeps the original look; dark follows the variables) ---------------- */
+#panel, .card, .widget, .pane, .ctxmenu, .skbar, .skask, .esbox, .mbox, .sdlg, .v3p, .confirmbox, .maplegend { background: var(--panel); color: var(--ink); border-color: var(--line); }
+.card { background: var(--panel); } .cardh { color: var(--ink); }
+.widget .wh, .pane .ph, .confirmbox .wh { background: var(--panel2); border-color: var(--line); color: var(--ink); }
+.widget .wh .x, .pane .ph .x, .confirmbox .wh .x { color: var(--muted); }
+input, select, textarea { background: var(--input); color: var(--ink); border-color: var(--line); }
+input:disabled, .widget .af input:disabled { background: var(--panel2); color: var(--muted); }
+button.ghost { color: var(--ink); border-color: var(--line); background: transparent; }
+button.ghost:hover { background: var(--hover); }
+label.file { background: var(--input); color: var(--accent); }
+.seg button { background: var(--input); color: var(--ink); border-color: var(--line); }
+.seg button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tabs { border-color: var(--line); } .tabs button { color: var(--muted); } .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.chips button, .tools button, .widget .ub, .pane .mt, .hier button, .v3seg button, .maplegend .lh button { background: var(--input); color: var(--ink); border-color: var(--line); }
+.widget .ub:hover, .pane .mt:hover, .ctxmenu .mi:hover, #stdList a:hover { background: var(--hover); }
+.hier button.on, #stdList a.on { background: var(--on); }
+.badge { background: var(--panel2); color: var(--muted); }
+.badge.run { background: var(--run-bg); } .badge.ok { background: var(--ok-bg); } .badge.bad { background: var(--bad-bg); }
+.stages label { border-color: var(--line); } .stages label.done { background: var(--ok-bg); } .stages label.now { background: var(--run-bg); }
+.stages .pb, .bar { background: var(--panel2); }
+.alertbox, .rcbox, .vznote { background: var(--note-bg); color: var(--ink); }
+.widget .sk, .widget .mres, .widget .selinfo { background: var(--note-bg); border-color: var(--line); color: var(--ink); }
+.widget .flash { background: var(--ok-bg); }
+.widget .g2 > span:nth-child(odd), table.attr th { color: var(--muted); }
+.mini, .hint, .lbl, .lgh, .lsub, .widget .lbl2, .pane .mg, .stages .pct, .stages .nt, .ribbon .gl { color: var(--muted); }
+table.mini td, table.mini th, table.stab th, table.stab td, #mBody td, #mBody th, .ctxmenu hr, .sub, .widget .sep { border-color: var(--line); }
+table.stab th, .sint { background: var(--panel2); } table.mini tr.best td { background: var(--ok-bg); }
+#stdList, .stop { border-color: var(--line); }
+details.lg > summary { color: var(--ink); }
+.psopt { border-color: var(--line); }
+.leaflet-container { background: var(--bg); }
+html[data-theme="dark"] .leaflet-popup-content-wrapper, html[data-theme="dark"] .leaflet-popup-tip, html[data-theme="dark"] .leaflet-tooltip:not(.ang),
+html[data-theme="dark"] .leaflet-control-layers, html[data-theme="dark"] .leaflet-control-attribution { background: var(--panel); color: var(--ink); border-color: var(--line); }
+html[data-theme="dark"] .leaflet-bar a { background-color: var(--panel); color: var(--ink); border-color: var(--line); }
+html[data-theme="dark"] .leaflet-bar a:hover { background-color: var(--hover); }
+html[data-theme="dark"] .leaflet-control-attribution a { color: var(--accent); }
+html[data-theme="dark"] .mbox img, html[data-theme="dark"] #stdBody figure img { background: #fff; }
+html[data-theme="dark"] svg.vz { background: #fff; border-radius: 4px; }
+html[data-theme="dark"] pre#log { background: #111214; }
+.blk { background: rgba(255,255,255,.88); }
+/* the map legend lives in the Contents pane now */
+.maplegend { display: none !important; }
+/* the map overlays sit below the ribbon now: no extra offset */
+.leaflet-top.leaflet-left { top: 0; }
+@media (max-width: 900px) { #contents { display: none; } .split { display: none; } #rdock { width: 320px; } }
+/* touch-ups */
+html[data-theme="dark"] .leaflet-draw-toolbar a, html[data-theme="dark"] .leaflet-control-layers-toggle { background-color: #e9eaec !important; }
+.leaflet-control-layers { display: none !important; }              /* the basemap is chosen on the Map tab */
+.ribbonhost .ribbon [data-t=snap] { display: none !important; }    /* Snapping: one button, in the Edits group */
+.ribbonhost .ribbon button { min-width: 48px; padding: 3px 4px; }
+.ribbonhost .ribbon .grp { padding: 0 6px; }
+html[data-theme="dark"] .badge.ok { color: #81c784; } html[data-theme="dark"] .badge.run { color: #ffb74d; } html[data-theme="dark"] .badge.bad { color: #ef9a9a; }

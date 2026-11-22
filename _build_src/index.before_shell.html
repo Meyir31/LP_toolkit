@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LP Toolkit</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <div class="brand"><button id="panelBtn" class="panelbtn" title="Show / hide the side panel">&#9776;</button>LP Toolkit <span>local plan preparation</span></div>
+  <div class="proj">
+    <select id="projSel"><option value="">Choose a project</option></select>
+    <button id="newProj" class="ghost">New project</button>
+    <button id="guideBtn" class="ghost">Guide</button>
+    <button id="v3dBtn" class="ghost" title="3D view: terrain, land use and buildings by height">3D view</button>
+    <button id="stdBtn" class="ghost" title="LUSPA zoning guidelines and planning standards (2025)">Standards</button>
+  </div>
+</header>
+<main>
+  <aside id="panel">
+    <div id="noProj" class="empty">
+      <h2>Start</h2>
+      <p>Create a project, then draw or upload the site boundary.</p>
+      <ol>
+        <li><b>Existing situation</b>: maps buildings, roads, blocks, existing plots and land use of a built-up area from the satellite image and the building database.</li>
+        <li><b>New layout</b>: roads (drawn by you, designed by the toolkit, or drafted for you to edit), plots, facilities and a design audit.</li>
+      </ol>
+    </div>
+    <div id="proj" hidden>
+      <div class="ptitle"><h2 id="pName"></h2><span><span id="pState" class="badge"></span> <button id="delProj" class="ghost danger" title="Delete this project">Delete</button></span></div>
+      <nav class="tabs"><button data-tab="inputs" class="on">1. Site and inputs</button><button data-tab="run">2. Run</button><button data-tab="results">3. Results</button></nav>
+
+      <section id="tab-inputs">
+        <label class="lbl">Workflow</label>
+        <div class="seg" id="wfSeg"><button data-wf="existing">Existing situation</button><button data-wf="design">New layout</button></div>
+        <label class="lbl">Title on maps</label><input id="pTitle" placeholder="e.g. Test 6 (Teshie)">
+
+        <div class="card">
+          <div class="cardh">Site boundary <span id="siteState" class="mini"></span></div>
+          <div class="row"><button class="draw" data-kind="site" data-shape="polygon">Draw boundary</button><label class="file">Upload KML / GeoJSON / zipped SHP<input type="file" data-kind="site"></label></div>
+          <div class="row"><span class="mini">Satellite imagery for the analysis</span><select id="imagery"><option value="google">Google satellite (Esri as fallback)</option><option value="esri">Esri World Imagery (Google as fallback)</option></select></div>
+        </div>
+
+        <div id="designInputs">
+          <div class="card">
+            <div class="cardh">Site analysis (do this first) <span id="terrState" class="mini"></span></div>
+            <p class="hint">Downloads the elevation model, then prepares contours, slope, slope classes and the steep-slope reserve. Review them before planning the roads.</p>
+            <div class="row"><span class="mini">Keep slopes steeper than</span><input id="steep" type="number" value="30" min="0" max="100" step="5" style="width:70px"><span class="mini">% as green (0 = off)</span></div>
+            <div class="row"><button id="siteBtn">Prepare site analysis</button></div>
+            <div id="terrSum"></div>
+            <div id="terrLayers"></div>
+          </div>
+          <div class="card">
+            <div class="cardh">Existing roads to keep <span class="mini">(optional; default: OpenStreetMap)</span></div>
+            <div class="row"><span class="mini">Width</span><select id="exW"><option>30</option><option selected>40</option><option>60</option><option>80</option><option>100</option><option>120</option><option>150</option><option>200</option><option>300</option></select>
+              <button class="draw" data-kind="existing" data-shape="polyline">Draw</button><label class="file">Upload<input type="file" data-kind="existing"></label></div>
+          </div>
+          <div class="card">
+            <div class="cardh">Stream / drainage <span class="mini">(optional)</span></div>
+            <div class="row"><button class="draw" data-kind="stream" data-shape="polyline">Draw stream</button><button class="draw" data-kind="stream" data-shape="polygon">Draw reserve</button><label class="file">Upload<input type="file" data-kind="stream"></label></div>
+            <div class="row"><span class="mini">Buffer each side</span><input id="streamBuf" type="number" value="100" min="0" step="10" style="width:80px"><span class="mini">ft</span></div>
+          </div>
+          <div class="card">
+            <div class="cardh">Roads <span id="roadsState" class="mini"></span></div>
+            <p class="hint">Edit the roads with the <b>editing ribbon</b> at the top of the map, as in ArcGIS Pro: <b>Select</b>, <b>Create road</b> (width templates), <b>Offset</b>, <b>Extend</b>, <b>Trim</b>, <b>Split</b>, <b>Square ends</b>, <b>Attributes</b>, <b>Delete</b>, <b>Undo / Redo</b> (Ctrl+Z / Ctrl+Y) and <b>Snapping</b>. Each tool opens a panel: select roads, set the options, check the preview, Apply.</p>
+            <p class="hint" id="toolHint"></p>
+            <div class="row"><label class="tl"><input type="checkbox" id="showAngles" checked> Show junction angles</label><span class="mini" id="angleSum"></span></div>
+            <div class="row"><label class="file">Upload roads<input type="file" data-kind="roads"></label></div>
+
+            <div class="sub">
+              <div class="cardh">Design the roads for me</div>
+              <div class="grid2">
+                <span class="mini">Pattern</span><select id="dPattern"><option value="mixed">Blended (best pattern per parcel)</option><option value="grid">Grid iron</option><option value="curvilinear">Curvilinear (follows the contours)</option></select>
+                <span class="mini">Block depth</span><select id="dBand"><option value="200">200 ft (2 x 100 ft plots)</option><option value="240">240 ft (2 x 120 ft plots)</option></select>
+                <span class="mini">Block length</span><select id="dLen"><option value="420">420 ft (6 x 70)</option><option value="490" selected>490 ft (7 x 70)</option><option value="560">560 ft (8 x 70)</option></select>
+                <span class="mini">Plot size (ft)</span><span class="psz"><input id="dPW" type="number" min="30" max="400" step="1" placeholder="70" title="Plot breadth (frontage), ft"> x <input id="dPL" type="number" min="30" max="600" step="1" placeholder="100" title="Plot length (depth), ft"></span>
+                <span class="mini">Local roads</span><select id="dLocal"><option>24</option><option selected>30</option><option>40</option></select>
+                <span class="mini">Collectors</span><select id="dColl"><option selected>40</option><option>50</option><option>60</option></select>
+                <span class="mini">Parcels up to</span><select id="dParcel"><option value="25">25 ac</option><option value="35" selected>35 ac</option><option value="50">50 ac</option></select>
+              </div>
+              <p class="hint" id="pszHint">Plot size: breadth (frontage) x length (depth) for the whole planning area. Empty = the LUSPA standard (65-80 x 100 ft). When set, the block depth (2 x length) and block length (whole plots) follow, and every design run cuts the plots to this size. For single blocks after the design use <b>Plot size</b> on the ribbon.</p>
+              <div class="row"><button id="designBtn">Design the roads for me</button></div>
+              <p class="hint">Replaces the current roads with a new design (existing roads and stream / steep reserves are kept). The result loads here for editing.</p>
+            </div>
+            <div class="sub">
+              <div class="cardh">Suggest a redesign</div>
+              <p class="hint">Draw the area to redesign, choose how, then Redesign. Roads outside the area and roads you drew or edited yourself are kept; the rest of the area is laid out again and joined to the kept roads. Pattern and block settings come from "Design the roads for me" above.</p>
+              <div class="row"><button class="draw" data-kind="zones" data-shape="polygon">Draw redesign area</button><button id="clearZones" class="ghost">Clear areas</button><button id="redesignBtn">Redesign</button></div>
+            </div>
+          </div>
+        </div>
+        <div id="existingInputs">
+          <div class="card"><div class="cardh">Buildings</div>
+            <label class="tl"><input type="radio" name="bmode" value="fast" checked> OpenStreetMap + building database (fast: about 15 to 25 minutes)</label>
+            <label class="tl"><input type="radio" name="bmode" value="full"> Also detect buildings on the image with SAM (slow: about 3 minutes per image tile, hours for a large site; use where footprints are missing)</label>
+            <p class="hint">Fast route: OSM outlines where they exist, database outlines (Google, Microsoft) where OSM has none, occupancy and height for every building, walls and fences from the image.</p></div>
+          <div class="card"><div class="cardh">Plot profile</div>
+            <select id="profile"><option value="auto">Automatic (from building sizes)</option><option value="planned">Planned / estate area</option><option value="compact">Compact / indigenous core</option></select>
+            <p class="hint">Data come from the satellite image, OpenStreetMap, Microsoft footprints and the building database (D:/Work/2026/Data).</p></div>
+        </div>
+      </section>
+
+      <section id="tab-run" hidden>
+        <div class="card">
+          <div class="cardh">Stages</div>
+          <div id="stageList" class="stages"></div>
+          <div class="row"><span class="mini">Run</span><select id="runMode"><option value="all">all stages</option><option value="from">from the selected stage</option><option value="only">only the selected stage</option></select></div>
+          <div id="extras" class="radio"><label><input type="checkbox" id="xFoot"> Footpaths (trial, not reliable)</label><label><input type="checkbox" id="xProp"> Upgrading proposals</label></div>
+          <label class="chk" id="chamferRow" title="LUSPA corner truncations (Guidelines 10.1.1): 3.5 m on local roads, 5 m on collectors, 10 m on arterials; never more than a quarter of the plot side. The cut corner is added to the road reserve."><input type="checkbox" id="chamfer"> Chamfer corner plots after the design (LUSPA 3.5 / 5 / 10 m)</label>
+          <div class="row"><button id="runBtn">Run</button><button id="stopBtn" class="ghost">Stop</button></div>
+          <div class="bar"><div id="barIn"></div></div><div id="runMsg" class="mini"></div>
+        </div>
+        <div id="runFail" class="alertbox" hidden></div>
+        <pre id="log"></pre>
+      </section>
+
+      <section id="tab-results" hidden>
+        <div id="confirmAlert" class="alertbox" hidden></div>
+        <div class="card"><div class="cardh">Map layers</div><div id="layerList"></div><div id="legend"></div></div>
+        <div class="card" id="chamferCard" hidden><div class="cardh">Corner plots</div><p class="hint">Cut LUSPA corner truncations on every corner plot of this design (3.5 m local, 5 m collector, 10 m arterial; at most a quarter of the plot side). Plots and road reserves change together; plots already chamfered are left as they are.</p><button id="chamferNow">Chamfer corner plots now</button></div>
+        <div class="card"><div class="cardh">Maps, tables and reports</div><div id="fileList"></div></div>
+        <div class="card"><div class="cardh">Download</div>
+          <p class="hint">Tick the outputs you need. Map layers come as shapefiles (EPSG:2136, Ghana National Grid, with .prj), maps as PNG, tables as Excel. One zip.</p>
+          <div class="row"><button class="ghost small" id="dlAll">All</button><button class="ghost small" id="dlNone">None</button></div>
+          <div id="dlList"></div>
+          <div class="row"><button id="dlBtn">Download selected</button> <a id="zipBtn" class="mini" href="#">or everything</a></div></div>
+      </section>
+    </div>
+  </aside>
+  <div id="map"></div>
+</main>
+
+<div id="v3d" hidden><div id="v3map"></div>
+  <div class="v3p"><div class="v3h"><b>3D view</b><button id="v3x" class="ghost">Close</button></div>
+    <div id="v3msg" class="mini"></div>
+    <div class="v3g"><label><input type="checkbox" id="v3bd" checked> Buildings (extruded)</label><label><input type="checkbox" id="v3pl" checked> Plots / land use</label>
+      <label><input type="checkbox" id="v3rd" checked> Road surface</label><label><input type="checkbox" id="v3st" checked> Site boundary</label>
+      <label><input type="checkbox" id="v3sat" checked> Satellite image</label><label><input type="checkbox" id="v3hs"> Hillshade</label></div>
+    <div class="v3r"><span>Terrain exaggeration</span><input type="range" id="v3ex" min="1" max="5" step="0.5" value="1.5"><b id="v3exv">1.5x</b></div>
+    <div class="v3r"><span>Building height</span><input type="range" id="v3hx" min="1" max="4" step="0.5" value="1"><b id="v3hxv">1x</b></div>
+    <div class="v3r"><span>Colour buildings by</span><select id="v3col"><option value="use">Use (LUSPA)</option><option value="height">Storeys</option><option value="white">Plain white</option></select></div>
+    <div id="v3leg" class="v3leg"></div>
+    <div class="v3r"><button id="v3fit" class="ghost small">Whole site</button><button id="v3top" class="ghost small">Top view</button><button id="v3tilt" class="ghost small">Tilt / turn</button></div>
+    <p class="mini"><b>Mouse</b> (as in Google Earth): left-drag moves; right-drag, middle-button drag or Shift+drag tilts (up / down) and turns (left / right); scroll zooms. Click a building for its use and height.</p></div>
+</div>
+<div id="stdDlg" hidden><div class="sdlg">
+  <div class="stop"><b>Planning standards</b><span class="mini">LUSPA Revised Zoning Guidelines and Planning Standards, 2025 (simplified)</span><input id="stdQ" type="search" placeholder="Search: e.g. setback, school, 70 x 100, buffer"><button id="stdX" class="ghost">Close</button></div>
+  <div class="smain"><nav id="stdList"></nav><section id="stdBody"></section></div>
+</div></div>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mClose">Close</button><div id="mBody"></div></div></div>
+<div id="newDlg" hidden><div class="mbox small">
+  <h3>New project</h3>
+  <label class="lbl">Name</label><input id="nName" placeholder="e.g. Teshie extension">
+  <label class="lbl">Title on maps</label><input id="nTitle" placeholder="optional">
+  <label class="lbl">Workflow</label>
+  <div class="seg" id="nWf"><button data-wf="existing">Existing situation</button><button data-wf="design" class="on">New layout</button></div>
+  <div id="nMsg" class="errmsg"></div>
+  <div class="row right"><button class="ghost" id="nCancel">Cancel</button><button id="nCreate">Create</button></div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="/static/app.js"></script>
+<script src="/static/pro.js"></script>
+<script src="/static/icons.js"></script>
+<script src="/static/editor.js"></script>
+<script src="/static/features.js"></script>
+<script src="/static/pro_panes.js"></script>
+<script src="/static/plotsize.js"></script>
+<script src="/static/standards.js"></script>
+<script src="/static/view3d.js"></script>
+</body>
+</html>

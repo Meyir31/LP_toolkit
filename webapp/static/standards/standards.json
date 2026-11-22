@@ -1,0 +1,2504 @@
+{
+ "source": "Revised Zoning Guidelines and Planning Standards (LUSPA, October 2025). Simplified summary for quick reference; check the full document before approval decisions.",
+ "groups": [
+  "Residential",
+  "Education",
+  "Place of worship",
+  "Health",
+  "Business and commercial",
+  "Public space",
+  "Coastal and conservation",
+  "Transport and roads",
+  "Industrial",
+  "Tourism and heritage",
+  "Utilities and services",
+  "Emergency and security",
+  "Agriculture and rural",
+  "General site rules"
+ ],
+ "items": [
+  {
+   "id": "re_a",
+   "code": "Re A",
+   "name": "Residential Zone A: low density",
+   "group": "Residential",
+   "fill": "#CC7722",
+   "page": 7,
+   "img": [
+    "p021_0.jpg",
+    "p022_0.jpg"
+   ],
+   "cap": "Sample layout of Residential Zone A (LUSPA, 2025)",
+   "intent": "Very low density, upscale neighbourhoods of detached houses and duplexes on large plots (4 to 6 plots per acre). Kept green and quiet: only uses that directly serve residents.",
+   "permitted": [
+    "Detached, duplex and courtyard houses",
+    "Public open space and playgrounds",
+    "Neighbourhood shops, clinics, pharmacies (max 250 m2 floor area)",
+    "Pre-school and basic school",
+    "Home businesses (max 2 employees)",
+    "Place of worship (min 0.5 acre)",
+    "Cylinder exchange points, EV charging"
+   ],
+   "prohibited": [
+    "Blocks of flats",
+    "Industry",
+    "Large commercial complexes",
+    "Cemetery or crematorium",
+    "Animal husbandry",
+    "Gas filling stations",
+    "Haulage transport"
+   ],
+   "std": [
+    [
+     "Density",
+     "Max 6 plots per acre"
+    ],
+    [
+     "Min plot",
+     "0.23 acre (930 m2), 100 x 100 ft, min width 70 ft"
+    ],
+    [
+     "Max coverage",
+     "40%"
+    ],
+    [
+     "Height",
+     "Up to 2 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m (19.7 ft), side 3 m (9.8 ft), rear 5 m (16.4 ft)"
+    ],
+    [
+     "Occupancy",
+     "About 1.5 persons per room"
+    ],
+    [
+     "Services",
+     "Full urban services; approved septic system where there is no sewer"
+    ]
+   ],
+   "viz": {
+    "w": 100,
+    "d": 100,
+    "front": 6,
+    "side": 3,
+    "rear": 5,
+    "cov": 40,
+    "st": 2,
+    "mode": "max"
+   }
+  },
+  {
+   "id": "re_b",
+   "code": "Re B",
+   "name": "Residential Zone B: medium density",
+   "group": "Residential",
+   "fill": "#E5AA70",
+   "page": 9,
+   "img": [
+    "p024_0.jpg"
+   ],
+   "cap": "Sample layout of Residential Zone B (LUSPA, 2025)",
+   "intent": "Standard middle-income neighbourhood: detached, duplex, row and compound houses, with small shops and services within walking distance.",
+   "permitted": [
+    "Detached, duplex, row and compound houses",
+    "Open space",
+    "Local shops, markets with repair workshops",
+    "Basic school, day care",
+    "Clinic, post office, community facilities",
+    "Places of worship",
+    "Home businesses (max 3 employees)",
+    "Trotro / minibus stop, taxi rank",
+    "Cylinder exchange points, EV charging"
+   ],
+   "prohibited": [
+    "Multi-storey apartment blocks",
+    "Factories and warehouses",
+    "Large retail, office complexes, nightclubs",
+    "Bus terminals and truck depots",
+    "Major sports facilities",
+    "Cemeteries",
+    "Animal husbandry, stockyards",
+    "Noxious uses",
+    "Gas filling stations"
+   ],
+   "std": [
+    [
+     "Min plot",
+     "0.16 acre (647 m2), 70 x 100 ft, min width 50 ft"
+    ],
+    [
+     "Max coverage",
+     "50%"
+    ],
+    [
+     "Height",
+     "Up to 3 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m, side 3 m, rear 3 m"
+    ],
+    [
+     "Parking",
+     "Min 1 vehicle per dwelling"
+    ],
+    [
+     "Roads",
+     "Internal connectivity; discourage through traffic"
+    ],
+    [
+     "Services",
+     "Piped water, electricity to every plot; drains along roads"
+    ]
+   ],
+   "viz": {
+    "w": 70,
+    "d": 100,
+    "front": 6,
+    "side": 3,
+    "rear": 3,
+    "cov": 50,
+    "st": 3,
+    "mode": "max"
+   }
+  },
+  {
+   "id": "re_c",
+   "code": "Re C",
+   "name": "Residential Zone C: high-rise apartments",
+   "group": "Residential",
+   "fill": "#BB8855",
+   "page": 11,
+   "img": [
+    "p026_0.jpg"
+   ],
+   "cap": "Sample of Residential Zone C (LUSPA, 2025)",
+   "intent": "Intensive multi-storey housing (flats, apartments, condominiums) of 3 storeys and above. Density up to about 120 persons per acre.",
+   "permitted": [
+    "Multi-storey flats and apartments",
+    "Hostels, staff housing, barracks",
+    "Public open space",
+    "Places of worship",
+    "Clinics, pharmacies",
+    "Pre-school, primary, JHS",
+    "Hotels, guest houses",
+    "Shops at ground floor only"
+   ],
+   "prohibited": [
+    "All industry and warehouses",
+    "Animal husbandry",
+    "Cemetery and crematorium",
+    "Bus depots, lorry parks, logistics",
+    "Stadiums and large sports complexes",
+    "Gas filling stations"
+   ],
+   "std": [
+    [
+     "Min plot",
+     "1 acre (4,047 m2)"
+    ],
+    [
+     "Max coverage",
+     "75%; remaining 25% landscaped"
+    ],
+    [
+     "Height",
+     "Min 3 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m, side 3 m, rear 3 m"
+    ],
+    [
+     "Parking",
+     "Min 1 vehicle per dwelling unit"
+    ],
+    [
+     "Access",
+     "Connect to at least a collector road"
+    ],
+    [
+     "Health",
+     "Waste, wastewater / bio-digester and ventilation critical"
+    ]
+   ],
+   "viz": {
+    "w": 208.7,
+    "d": 208.7,
+    "front": 6,
+    "side": 3,
+    "rear": 3,
+    "cov": 75,
+    "st": 3,
+    "mode": "min",
+    "nodim": true
+   }
+  },
+  {
+   "id": "re_d",
+   "code": "Re D",
+   "name": "Residential Zone D: high density, low-rise",
+   "group": "Residential",
+   "fill": "#98623C",
+   "page": 13,
+   "img": [
+    "p028_0.jpg"
+   ],
+   "cap": "Sample of Residential Zone D",
+   "intent": "Existing high-density low and mid-rise areas (compound houses, row houses, low-rise flats), formal or informal, often targeted for upgrading. Up to 20 plots per acre.",
+   "permitted": [
+    "Detached, semi-detached, row and compound houses",
+    "Home businesses, informal activity",
+    "Parks and playgrounds",
+    "Places of worship",
+    "Local markets, clinic, pharmacy",
+    "Day care, primary, JHS",
+    "Taxi rank, lorry park",
+    "Small workshops (carpentry, tailoring, welding, auto repair)"
+   ],
+   "prohibited": [
+    "Heavy industry",
+    "Large service industries",
+    "Major commercial premises",
+    "Animal husbandry",
+    "Cemetery or crematorium",
+    "Transport depots",
+    "Power plants, waste dumps",
+    "Gas filling stations"
+   ],
+   "std": [
+    [
+     "Min plot",
+     "0.045 acre (182 m2), 40 x 50 ft, min width 40 ft"
+    ],
+    [
+     "Max coverage",
+     "60%"
+    ],
+    [
+     "Height",
+     "1 to 3 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 3 m, side 1.5 m, rear 1.5 m"
+    ],
+    [
+     "Parking",
+     "1 vehicle per 2 dwelling units"
+    ],
+    [
+     "Open space",
+     "At least 15% of land"
+    ],
+    [
+     "Resilience",
+     "Fire lanes at intervals, hydrants, assembly points"
+    ]
+   ],
+   "viz": {
+    "w": 40,
+    "d": 50,
+    "front": 3,
+    "side": 1.5,
+    "rear": 1.5,
+    "cov": 60,
+    "st": 3,
+    "st0": 1,
+    "mode": "range"
+   }
+  },
+  {
+   "id": "re_z",
+   "code": "Re Z",
+   "name": "Redevelopment / renewal / upgrading zone",
+   "group": "Residential",
+   "fill": "#FFFFFF",
+   "edge": "#000000",
+   "dash": true,
+   "page": 15,
+   "img": [
+    "p031_0.jpg"
+   ],
+   "cap": "Sample of Re Z (photo: KBC, 2025)",
+   "intent": "Transitional zone for urban renewal or upgrading (dilapidated inner-city areas, informal settlements). Raise density and quality in a phased, controlled way, with temporary accommodation for affected residents. Shown as an area outlined with a broken black line.",
+   "permitted": [
+    "High-rise / high-density housing",
+    "Local markets, convenience shops",
+    "Mixed uses, business and commercial",
+    "Urban health centre",
+    "Places of worship",
+    "Basic school",
+    "Public open space",
+    "Home-based economic activity"
+   ],
+   "prohibited": [
+    "Projects that relocate many people",
+    "Cemeteries and crematoriums",
+    "Large industry",
+    "Anything contrary to the redevelopment plan",
+    "Gas filling stations"
+   ],
+   "std": [
+    [
+     "Min plot",
+     "0.25 acre (1,011 m2), 100 x 110 ft, min width 70 ft"
+    ],
+    [
+     "Max coverage",
+     "75%"
+    ],
+    [
+     "Height",
+     "Min 3 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 2.5 m, side 2.5 m, rear 3 m"
+    ],
+    [
+     "Non-built land",
+     "At least 45%: 30% streets, 15% public open space"
+    ],
+    [
+     "Heritage",
+     "Preserve historical and cultural buildings"
+    ]
+   ],
+   "viz": {
+    "w": 100,
+    "d": 110,
+    "front": 2.5,
+    "side": 2.5,
+    "rear": 3,
+    "cov": 75,
+    "st": 3,
+    "mode": "min",
+    "fill": "#8D8D8D"
+   }
+  },
+  {
+   "id": "neigh",
+   "code": "Re",
+   "name": "Residential neighbourhood: mandatory facilities",
+   "group": "Residential",
+   "fill": "#DC7C24",
+   "page": 17,
+   "intent": "A neighbourhood is bounded by landmarks such as streams or major roads and has a projected population under 5,000. Villages under 5,000 people within 5 km of each other are grouped as one neighbourhood.",
+   "std": [
+    [
+     "Population",
+     "Less than 5,000 persons"
+    ],
+    [
+     "Mandatory facilities",
+     "Nursery; primary school; junior high school; neighbourhood shopping centre or local market with shops and parking; health post; postal agency; public space (football field, children's play area); refuse / sanitary site"
+    ]
+   ],
+   "tables": [
+    {
+     "title": "Site development standards (section 2.6)",
+     "head": [
+      "Zone",
+      "Min plot",
+      "Plot (ft)",
+      "Min width",
+      "Coverage",
+      "Height",
+      "Front / side / rear"
+     ],
+     "rows": [
+      [
+       "Re A",
+       "0.23 ac / 930 m2",
+       "100 x 100",
+       "70 ft",
+       "40%",
+       "up to 2",
+       "6 / 3 / 5 m"
+      ],
+      [
+       "Re B",
+       "0.16 ac / 647 m2",
+       "70 x 100",
+       "50 ft",
+       "50%",
+       "up to 3",
+       "6 / 3 / 3 m"
+      ],
+      [
+       "Re C",
+       "1 ac / 4,047 m2",
+       "-",
+       "-",
+       "75%",
+       "min 3",
+       "6 / 3 / 3 m"
+      ],
+      [
+       "Re D",
+       "0.045 ac / 182 m2",
+       "40 x 50",
+       "40 ft",
+       "60%",
+       "1 to 3",
+       "3 / 1.5 / 1.5 m"
+      ],
+      [
+       "Re Z",
+       "0.25 ac / 1,011 m2",
+       "100 x 110",
+       "70 ft",
+       "75%",
+       "min 3",
+       "2.5 / 2.5 / 3 m"
+      ]
+     ]
+    }
+   ],
+   "vizcmp": true
+  },
+  {
+   "id": "ed_p",
+   "code": "Ed P",
+   "name": "Education Zone A: pre-school and basic school",
+   "group": "Education",
+   "fill": "#FFFF00",
+   "edge": "#C00000",
+   "pc": "#000000",
+   "hatch": "dots",
+   "page": 19,
+   "img": [
+    "p033_0.jpg"
+   ],
+   "cap": "Education zone (LUSPA, 2025)",
+   "intent": "Nursery, kindergarten, primary and JHS inside residential areas, with easy pedestrian and vehicle access. Playground is mandatory.",
+   "permitted": [
+    "Classroom blocks, offices, library",
+    "Teachers' accommodation",
+    "Canteen, convenience and stationery shop",
+    "Laboratories, teaching workshops",
+    "Playgrounds, sick bay, parking"
+   ],
+   "prohibited": [
+    "Transport and warehouses",
+    "Animal husbandry",
+    "Slaughter houses",
+    "Industries"
+   ],
+   "std": [
+    [
+     "Nursery / KG",
+     "0.5 acre; walking distance up to 1.25 km"
+    ],
+    [
+     "Primary",
+     "3 acres; per neighbourhood of up to 5,000 people; walk up to 2.5 km"
+    ],
+    [
+     "JHS",
+     "4 acres; between two neighbourhoods (up to 10,000); walk up to 3.2 km"
+    ],
+    [
+     "Combined KG to JHS",
+     "6 acres"
+    ],
+    [
+     "Class size",
+     "Primary 35 to 40 pupils; JHS 30 to 35"
+    ],
+    [
+     "Primary facilities",
+     "Min 6 classrooms, head's office and store, sports fields, 12-seater toilets, garden, water and electricity, parking"
+    ],
+    [
+     "Urban areas",
+     "Double-storey classroom blocks encouraged"
+    ]
+   ]
+  },
+  {
+   "id": "ed_s",
+   "code": "Ed S",
+   "name": "Education Zone B: SHS and TVET",
+   "group": "Education",
+   "fill": "#FFFF00",
+   "edge": "#C00000",
+   "pc": "#000000",
+   "hatch": "vert",
+   "page": 22,
+   "img": [
+    "p036_0.jpg"
+   ],
+   "cap": "Sample of Ed S (LUSPA, 2025)",
+   "intent": "Senior high schools and technical / vocational institutes, sited between one or two neighbourhoods with good transport.",
+   "permitted": [
+    "Classroom blocks, labs, workshops",
+    "Administration, library, assembly hall",
+    "Dormitories, staff housing",
+    "Dining hall, kitchen, sanitation",
+    "Sports fields, place of worship, sick bay",
+    "Bookshop, printing, convenience shop, parking",
+    "Ancillary agriculture"
+   ],
+   "prohibited": [
+    "Unrelated housing",
+    "Markets",
+    "Industry, warehouses, transport",
+    "Crematorium, cemeteries",
+    "Animal husbandry (except teaching)",
+    "Mining"
+   ],
+   "std": [
+    [
+     "Land",
+     "Min 6 acres (single stream)"
+    ],
+    [
+     "Population",
+     "1 to 2 neighbourhoods, min 10,000 (served: 10,000 to 20,000)"
+    ],
+    [
+     "Commute",
+     "Up to 4 km"
+    ],
+    [
+     "Sports",
+     "Football field (1.7 acres), hockey, athletics track, basketball, volley / netball"
+    ],
+    [
+     "Library",
+     "120 to 200 m2"
+    ],
+    [
+     "Dormitory",
+     "4 to 5 m2 per student"
+    ],
+    [
+     "Services",
+     "Safe water, electricity, sick bay, waste depot reachable by trucks"
+    ]
+   ]
+  },
+  {
+   "id": "ed_t",
+   "code": "Ed T",
+   "name": "Education Zone C: tertiary",
+   "group": "Education",
+   "fill": "#FFFF00",
+   "edge": "#C00000",
+   "pc": "#000000",
+   "hatch": "horiz",
+   "page": 24,
+   "img": [
+    "p039_0.jpg"
+   ],
+   "cap": "Sample of Ed T (LUSPA, 2025)",
+   "intent": "Colleges, universities and specialised institutions: accessible, close to community facilities, but quiet enough for study.",
+   "permitted": [
+    "Lecture halls, auditorium, labs, library",
+    "Hostels, staff housing",
+    "Sports facilities, recreation",
+    "Hospital / clinic, police, fire station",
+    "Banks, shops, post office, minor market",
+    "Filling station, utilities",
+    "Research farms, places of worship"
+   ],
+   "prohibited": [
+    "Industry",
+    "Major transport terminals",
+    "Warehouses",
+    "Large markets",
+    "Saw milling",
+    "Crematorium",
+    "Animal husbandry (except research)"
+   ],
+   "std": [
+    [
+     "Land",
+     "Min 30 acres"
+    ],
+    [
+     "Population",
+     "About 50,000"
+    ],
+    [
+     "Layout",
+     "Academic core, residential clusters, service / commercial zone, sports"
+    ],
+    [
+     "Facilities",
+     "Lecture halls (100 to 500), auditorium (min 1,000 seats), student centre, health centre, security"
+    ],
+    [
+     "Access",
+     "Good road and public transport links; pedestrian core"
+    ]
+   ]
+  },
+  {
+   "id": "ed_tab",
+   "code": "Ed",
+   "name": "Education facilities: summary table",
+   "group": "Education",
+   "fill": "#FFFF00",
+   "edge": "#C00000",
+   "page": 27,
+   "tables": [
+    {
+     "title": "Table 11: school areas and catchments",
+     "head": [
+      "Facility",
+      "Pupils per class",
+      "Site area",
+      "Distance",
+      "Population served"
+     ],
+     "rows": [
+      [
+       "Kindergarten",
+       "35 to 40",
+       "0.5 acre",
+       "10 min walk",
+       "1,000 to 5,000"
+      ],
+      [
+       "Primary",
+       "35 to 40",
+       "3 acres",
+       "0.4 to 8 km",
+       "1,500 to 6,000"
+      ],
+      [
+       "Junior High",
+       "30 to 35",
+       "4 acres",
+       "3.2 to 8 km",
+       "5,000 to 10,000"
+      ],
+      [
+       "Senior High",
+       "25 to 35",
+       "6 acres",
+       "4 to 8 km",
+       "10,000 to 20,000"
+      ],
+      [
+       "KG to JHS combined",
+       "-",
+       "6 acres",
+       "0.4 to 8 km",
+       "1,000 to 10,000"
+      ],
+      [
+       "TVET",
+       "20 to 40",
+       "6 acres",
+       "4 to 8 km",
+       "10,000 to 20,000"
+      ],
+      [
+       "Tertiary (GTEC)",
+       "30 to 100",
+       "30 acres",
+       "-",
+       "50,000"
+      ],
+      [
+       "College / training school",
+       "25 to 35",
+       "-",
+       "whole district",
+       "10,000 to 20,000"
+      ]
+     ]
+    },
+    {
+     "title": "Room sizes",
+     "head": [
+      "Room",
+      "Floor area per pupil",
+      "Size"
+     ],
+     "rows": [
+      [
+       "Classroom",
+       "1.4 to 1.5 m2",
+       "about 6 x 8.4 m"
+      ],
+      [
+       "Science laboratory",
+       "2.7 m2",
+       "80 to 90 m2"
+      ],
+      [
+       "Computer laboratory",
+       "2.3 m2",
+       "70 to 80 m2"
+      ],
+      [
+       "Workshop",
+       "3.3 m2",
+       "100 to 120 m2"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pw",
+   "code": "PW",
+   "name": "Places of worship",
+   "group": "Place of worship",
+   "fill": "#FF7F7F",
+   "pc": "#000000",
+   "hatch": "tri",
+   "page": 30,
+   "img": [
+    "p044_0.jpg"
+   ],
+   "cap": "Place of worship zone (LUSPA, 2025)",
+   "intent": "Dedicated sites for religious bodies (mosques, churches, shrines) so warehouses, open spaces and classrooms are not turned into worship centres. Located within communities, accessible by vehicle and on foot.",
+   "permitted": [
+    "Worship centres",
+    "Offices, social and conference centres",
+    "Accommodation for religious leaders",
+    "Bookshop, library, canteen",
+    "Basic school, playground",
+    "Hostel / guest house",
+    "Car park, sick bay, sanitary facilities"
+   ],
+   "prohibited": [
+    "Police post",
+    "Transportation",
+    "Warehouses",
+    "Animal husbandry",
+    "Industries"
+   ],
+   "std": [
+    [
+     "Site area",
+     "Min 0.5 acre (about 1,000 m2 floor area)"
+    ],
+    [
+     "Setbacks",
+     "Front 10 m (32.8 ft); side and rear 5 m (16.4 ft)"
+    ],
+    [
+     "Parking",
+     "1 space per 40 m2 or per 10 seats"
+    ],
+    [
+     "Noise",
+     "EPA standards apply"
+    ],
+    [
+     "Access",
+     "Disability friendly; landscaped open space"
+    ]
+   ]
+  },
+  {
+   "id": "chps",
+   "code": "H",
+   "name": "CHPS compound",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 40,
+   "img": [
+    "p046_0.jpg"
+   ],
+   "cap": "Health zone (LUSPA, 2025)",
+   "intent": "Community-based health post for small rural or peri-urban communities. Within or at the edge of the settlement, reachable on foot, bicycle or motorbike. Not a zone: sits in residential or commercial areas.",
+   "std": [
+    [
+     "Population",
+     "500 to 5,000"
+    ],
+    [
+     "Land",
+     "Min 0.5 acre; 1 acre recommended"
+    ],
+    [
+     "Beds",
+     "Min 2 observation beds"
+    ],
+    [
+     "Travel time",
+     "15 to 30 minutes"
+    ],
+    [
+     "Site",
+     "Flat, well drained, not flood prone; away from dumps and stagnant water"
+    ],
+    [
+     "Services",
+     "Water, electricity with solar backup, septic / bio-digester, fencing"
+    ]
+   ]
+  },
+  {
+   "id": "clinic",
+   "code": "H",
+   "name": "Maternity home, health centre and clinic",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 41,
+   "intent": "Small standalone facilities that sit within residential or mixed-use areas, on accessible roads, at least 500 m from refuse dumps, fuel stations, slaughterhouses, markets and noisy sources.",
+   "std": [
+    [
+     "Maternity home",
+     "0.5 acre; 5,000 to 10,000 people; min 2 lying-in beds"
+    ],
+    [
+     "Health centre",
+     "2 acres; 5,000 to 15,000 people; min 4 beds; separate entry and exit preferred"
+    ],
+    [
+     "General / family clinic",
+     "1 acre; 5,000 to 20,000 people; min 2 observation beds"
+    ],
+    [
+     "Buffer",
+     "Min 500 m from pollution sources"
+    ]
+   ]
+  },
+  {
+   "id": "h_po",
+   "code": "H Po",
+   "name": "Health Zone A: polyclinic",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 33,
+   "intent": "Larger urban health centre with several out-patient specialties; referral centre for CHPS and health centres.",
+   "permitted": [
+    "OPD, immunisation",
+    "Administration and records",
+    "In-patient beds",
+    "Mortuary / body holding room",
+    "Canteen, shops, staff housing",
+    "Ambulance station, parking"
+   ],
+   "std": [
+    [
+     "Population",
+     "20,000 to 50,000+"
+    ],
+    [
+     "Land",
+     "Min 4 acres"
+    ],
+    [
+     "Beds",
+     "Min 15"
+    ],
+    [
+     "Travel time",
+     "15 to 20 minutes for most of the catchment"
+    ],
+    [
+     "Buffer",
+     "Min 500 m from pollution, busy markets, dumps"
+    ],
+    [
+     "Site",
+     "Flat, well drained, emergency access and drop-off"
+    ]
+   ]
+  },
+  {
+   "id": "h_d",
+   "code": "HD",
+   "name": "Health Zone B: district hospital",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 34,
+   "intent": "Serves the whole district: general medicine, surgery, obstetrics, paediatrics, imaging, emergency. First surgical referral point.",
+   "permitted": [
+    "OPD, emergency, theatres, wards",
+    "Imaging, labs, pharmacy, mortuary",
+    "Laundry, kitchen, workshops",
+    "Staff housing, shops, banks",
+    "Helipad, incinerator",
+    "Day care, place of worship, wellness park"
+   ],
+   "prohibited": [
+    "Industries",
+    "Animal husbandry",
+    "Fuel station",
+    "Terminals and bus stops",
+    "Warehouses, markets",
+    "Large commercial enterprises"
+   ],
+   "std": [
+    [
+     "Population",
+     "50,000 to 200,000"
+    ],
+    [
+     "Land",
+     "Min 10 acres"
+    ],
+    [
+     "Beds",
+     "Min 40"
+    ],
+    [
+     "Parking",
+     "Min 40 spaces"
+    ],
+    [
+     "Reach",
+     "Within 1 hour for most of the referral base"
+    ],
+    [
+     "Buffer",
+     "500 m from dumps, animal markets, fuel depots, industry; vegetative buffer"
+    ]
+   ]
+  },
+  {
+   "id": "h_r",
+   "code": "HR",
+   "name": "Health Zone C: regional hospital",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 36,
+   "intent": "Regional referral hospital with multiple specialties, ICU, dialysis and research.",
+   "prohibited": [
+    "Industries",
+    "Animal husbandry (except research)",
+    "Fuel station",
+    "Warehouses, markets",
+    "Large commercial enterprises"
+   ],
+   "std": [
+    [
+     "Population",
+     "100,000 to 300,000"
+    ],
+    [
+     "Land",
+     "Min 10 acres"
+    ],
+    [
+     "Beds",
+     "Min 60, plus ICU 5+, HDU 10+, emergency 6+"
+    ],
+    [
+     "Buffer",
+     "Min 500 m from cemeteries, abattoirs, fuel depots, dumps"
+    ]
+   ]
+  },
+  {
+   "id": "h_t",
+   "code": "HT",
+   "name": "Health Zone D: teaching / specialised / national hospital",
+   "group": "Health",
+   "fill": "#EE0000",
+   "page": 38,
+   "intent": "Apex national and international referral hospital with teaching and research.",
+   "std": [
+    [
+     "Population",
+     "Whole country (300,000+ and cross-border)"
+    ],
+    [
+     "Land",
+     "Min 30 acres"
+    ],
+    [
+     "Beds",
+     "Min 200"
+    ],
+    [
+     "Parking",
+     "250+ vehicles"
+    ],
+    [
+     "Buffer",
+     "Min 500 m from dumps, abattoirs, fuel depots, heavy industry"
+    ]
+   ]
+  },
+  {
+   "id": "h_tab",
+   "code": "H",
+   "name": "Health facilities: summary table",
+   "group": "Health",
+   "fill": "#FF0000",
+   "page": 43,
+   "tables": [
+    {
+     "title": "Section 5.9",
+     "head": [
+      "Facility",
+      "Population served",
+      "Min land",
+      "Min beds"
+     ],
+     "rows": [
+      [
+       "CHPS compound",
+       "500 to 5,000",
+       "0.5 acre",
+       "2"
+      ],
+      [
+       "Maternity home",
+       "5,000 to 10,000",
+       "0.5 acre",
+       "2"
+      ],
+      [
+       "Health centre",
+       "5,000 to 15,000",
+       "2 acres",
+       "4"
+      ],
+      [
+       "General / family clinic",
+       "5,000 to 20,000",
+       "1 acre",
+       "2"
+      ],
+      [
+       "Polyclinic",
+       "20,000 to 50,000",
+       "4 acres",
+       "15"
+      ],
+      [
+       "District hospital",
+       "50,000 to 200,000",
+       "10 acres",
+       "40"
+      ],
+      [
+       "Regional hospital",
+       "100,000 to 300,000",
+       "10 acres",
+       "60"
+      ],
+      [
+       "Teaching / specialised",
+       "300,000+",
+       "30 acres",
+       "200"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cbd",
+   "code": "CBD",
+   "name": "Central Business District",
+   "group": "Business and commercial",
+   "fill": "#2E4DA7",
+   "page": 45,
+   "img": [
+    "p059_0.jpg"
+   ],
+   "cap": "Business zone (LUSPA, 2025)",
+   "intent": "Economic, financial and administrative heart of the city: high-rise, high-density offices, banks, high-order retail, hotels, culture. Preserve heritage.",
+   "permitted": [
+    "Offices, banks, corporate and government HQs",
+    "Shops, restaurants, hotels",
+    "High-rise flats",
+    "Public open space, sport, leisure",
+    "Car parks, transport stations, walkways",
+    "Markets for finished goods",
+    "Clinics, pharmacies, fire stations, fuel stations, child care"
+   ],
+   "std": [
+    [
+     "Coverage",
+     "70 to 85%"
+    ],
+    [
+     "FAR",
+     "Min 6.0"
+    ],
+    [
+     "Height",
+     "5 storeys or more"
+    ],
+    [
+     "Setbacks",
+     "Front 3 m, side 2 m, rear 8 m"
+    ],
+    [
+     "Parking",
+     "Designated parking and loading bays; on-street parking discouraged"
+    ],
+    [
+     "Informal activity",
+     "2 to 5% of space"
+    ]
+   ]
+  },
+  {
+   "id": "sbz",
+   "code": "SBZ",
+   "name": "Sub-regional business zone",
+   "group": "Business and commercial",
+   "fill": "#587EDE",
+   "page": 46,
+   "intent": "Secondary centres at major junctions: produce and livestock markets, warehousing, cold stores, major retail, corporate offices, service industries.",
+   "permitted": [
+    "Produce and livestock markets",
+    "Bulk-breaking warehouses, cold stores",
+    "Offices, major retail",
+    "Service industries (mechanics, artisans)",
+    "Education, health, police, fire",
+    "Re C / Re D housing",
+    "Fuel stations, loading bays, EV charging"
+   ],
+   "prohibited": [
+    "Industrial development",
+    "Animal husbandry",
+    "Cemeteries / crematorium"
+   ],
+   "std": [
+    [
+     "FAR",
+     "Min 6.0"
+    ],
+    [
+     "Height",
+     "3 to 8 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 3 m, side 2 m, rear 8 m"
+    ],
+    [
+     "Parking",
+     "Offices 1 per 50 m2; shops 1 per 40 m2; assembly 1 per 40 m2 or 20 seats"
+    ],
+    [
+     "Traffic",
+     "Major road access, ring road or several access points; bus stops"
+    ],
+    [
+     "Informal activity",
+     "2 to 5% of space"
+    ]
+   ]
+  },
+  {
+   "id": "bm",
+   "code": "BM",
+   "name": "Mixed business / residential",
+   "group": "Business and commercial",
+   "fill": "#73B2FF",
+   "pc": "#FFAA57",
+   "hatch": "diag",
+   "page": 48,
+   "intent": "Lower-intensity commercial and mixed use on the fringe of business districts or along major roads; transition to residential. Shops, offices, workshops, homes above.",
+   "permitted": [
+    "Commercial, local government, corporate offices",
+    "Markets (under 2.5 acres)",
+    "Child care, clinics",
+    "Car park, motor sales, fuel station",
+    "Retail, workshops, showrooms",
+    "Storage and distribution, fire station"
+   ],
+   "prohibited": [
+    "Industrial development",
+    "Ground-floor-only intensive housing",
+    "Animal husbandry",
+    "Markets over 2.5 acres",
+    "Noxious uses",
+    "Major warehousing"
+   ],
+   "std": [
+    [
+     "Coverage",
+     "60 to 70%"
+    ],
+    [
+     "FAR",
+     "Min 4.0"
+    ],
+    [
+     "Height",
+     "1 to 3 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 5 m, side 3 m, rear 3 m"
+    ],
+    [
+     "Parking",
+     "1 per 50 m2 retail / office; 1 per 100 m2 workshop"
+    ],
+    [
+     "Access",
+     "Service roads; limit direct access to major roads"
+    ]
+   ]
+  },
+  {
+   "id": "bi",
+   "code": "BI",
+   "name": "Informal business zone",
+   "group": "Business and commercial",
+   "fill": "#73B2FF",
+   "pc": "#000000",
+   "hatch": "dots",
+   "page": 50,
+   "intent": "Local community trade around a community market, developed progressively. Small repairs and cottage industry allowed; no manufacturing.",
+   "permitted": [
+    "Local market (2.5 acres or less)",
+    "Local shops, street vending",
+    "Clinic, police post, sanitary facilities",
+    "Restaurants and bars",
+    "Cottage industry, day care",
+    "Motorbike service, taxi and bus terminal, car park"
+   ],
+   "prohibited": [
+    "Industry",
+    "Major commercial development",
+    "Cemetery",
+    "Extractive industry",
+    "Animal husbandry",
+    "Warehousing"
+   ],
+   "std": [
+    [
+     "Min site",
+     "7.5 m2"
+    ],
+    [
+     "Kiosk / stall / container",
+     "Min 2 x 2 m"
+    ],
+    [
+     "Layout",
+     "Must have a layout plan"
+    ]
+   ]
+  },
+  {
+   "id": "mkt",
+   "code": "Com",
+   "name": "Markets and shops",
+   "group": "Business and commercial",
+   "fill": "#73B2FF",
+   "page": 51,
+   "img": [
+    "p065_0.jpg"
+   ],
+   "cap": "Markets",
+   "tables": [
+    {
+     "title": "Section 6.5",
+     "head": [
+      "Facility",
+      "Catchment",
+      "Site",
+      "Notes"
+     ],
+     "rows": [
+      [
+       "Shop",
+       "Up to 500 persons",
+       "Min 0.25 acre",
+       "Part of the area (advisory)"
+      ],
+      [
+       "Neighbourhood shopping centre",
+       "5,000 to 15,000",
+       "Min 1 acre; floor min 200 m2",
+       "Parking min 10%; near clinic and nursery"
+      ],
+      [
+       "Local / satellite market",
+       "Up to 30,000",
+       "Up to 10 acres + 20 to 50% for parking",
+       "Central; near major road and transport terminal"
+      ],
+      [
+       "Large commercial market",
+       "Whole settlement",
+       "Min 3 ha (7.4 acres)",
+       "Parking min 10%; fire, toilets, child care, clinic"
+      ],
+      [
+       "Wholesale",
+       "-",
+       "83.6 m2 floor per 1,000 people",
+       "Advisory"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fuel",
+   "code": "Com",
+   "name": "Fuel stations and LPG plants: siting",
+   "group": "Business and commercial",
+   "fill": "#73B2FF",
+   "page": 52,
+   "intent": "Fuel stations are prohibited in all residential zones. Stations on a single carriageway are staggered, not opposite each other; not more than 3 stations in a 1 km stretch.",
+   "tables": [
+    {
+     "title": "Distance requirements",
+     "head": [
+      "Parameter",
+      "Fuel station",
+      "LPG plant"
+     ],
+     "rows": [
+      [
+       "Next station, same side",
+       "300 m",
+       "300 m"
+      ],
+      [
+       "Next station, across the road (staggered)",
+       "300 m",
+       "300 m"
+      ],
+      [
+       "Fuel station to LPG plant",
+       "500 m",
+       "500 m"
+      ],
+      [
+       "11 to 33 kV line (centre to boundary)",
+       "10 m",
+       "10 m"
+      ],
+      [
+       "69 to 161 kV line",
+       "15 m",
+       "15 m"
+      ],
+      [
+       "225 to 330 kV line",
+       "20 m",
+       "20 m"
+      ],
+      [
+       "Public institution (school, health)",
+       "60 m preferred",
+       "500 m"
+      ],
+      [
+       "Hot works (welding)",
+       "100 m",
+       "200 m"
+      ],
+      [
+       "Road bend",
+       "60 m",
+       "60 m"
+      ],
+      [
+       "Wetlands, dumps, streams, rivers",
+       "30 m",
+       "60 m"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bg",
+   "code": "BG",
+   "name": "Government business zone",
+   "group": "Business and commercial",
+   "fill": "#FF7F7F",
+   "pc": "#000000",
+   "hatch": "dots",
+   "page": 55,
+   "intent": "Ministries, assemblies, courts and agency head offices, with supporting restaurants, banks, clinics and shops.",
+   "permitted": [
+    "Government offices, assembly offices",
+    "Official residences in the enclave",
+    "Library, post office, police",
+    "Banks, food stalls, child care",
+    "Car parks, monuments, parade grounds",
+    "Bus stop, place of worship"
+   ],
+   "prohibited": [
+    "Private office blocks and commercial strips",
+    "Industry",
+    "Cemetery and crematorium",
+    "Animal husbandry",
+    "Informal business"
+   ],
+   "std": [
+    [
+     "Coverage",
+     "40 to 50%"
+    ],
+    [
+     "Height",
+     "Min 2 storeys"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m; side and rear min 4 m"
+    ],
+    [
+     "Open space",
+     "Parks and gardens"
+    ]
+   ]
+  },
+  {
+   "id": "ps",
+   "code": "PS",
+   "name": "Public space: parks, sports, durbar grounds",
+   "group": "Public space",
+   "fill": "#00FF00",
+   "page": 57,
+   "img": [
+    "p071_0.jpg"
+   ],
+   "cap": "Public space (LUSPA, 2025)",
+   "intent": "Open areas used by the public. Active (sports fields, durbar grounds) and passive (parks, gardens, playgrounds).",
+   "permitted": [
+    "Parks and gardens",
+    "Sports grounds and club buildings",
+    "Ancillary restaurant, changing rooms",
+    "Approved cultivation",
+    "Emergency facilities, exhibitions",
+    "Parking, public transport, landscaping"
+   ],
+   "prohibited": [
+    "Industry",
+    "Major commercial activity",
+    "Warehousing",
+    "Anything that blocks drainage or slopes",
+    "Abattoir"
+   ],
+   "tables": [
+    {
+     "title": "Public space standards",
+     "head": [
+      "Facility",
+      "Population",
+      "Site size"
+     ],
+     "rows": [
+      [
+       "Local field sports",
+       "Up to 5,000",
+       "1 acre per 1,000 people; min 5 to 6 acres"
+      ],
+      [
+       "Durbar ground",
+       "Up to 15,000",
+       "0.5 to 2.5 acres"
+      ],
+      [
+       "Event centre",
+       "Up to 5,000",
+       "Min 0.5 acre"
+      ],
+      [
+       "Parks and gardens",
+       "Min 2,500",
+       "1.2 acres per 1,000 people"
+      ],
+      [
+       "National sports complex",
+       "Whole country",
+       "25 to 37 acres"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cem",
+   "code": "SU",
+   "name": "Cemeteries, funeral homes, crematoria",
+   "group": "Public space",
+   "fill": "#FF7F7F",
+   "pc": "#000000",
+   "hatch": "diag",
+   "page": 59,
+   "intent": "One cemetery per village, town or urban area, on land with a low water table. Funeral homes and crematoria at least 300 m from the nearest house.",
+   "tables": [
+    {
+     "title": "Section 7.2",
+     "head": [
+      "Facility",
+      "Population",
+      "Site size"
+     ],
+     "rows": [
+      [
+       "Cemetery",
+       "Up to 5,000",
+       "1.24 to 2.5 acres"
+      ],
+      [
+       "Cemetery",
+       "5,000 to 15,000",
+       "2.5 to 3.7 acres"
+      ],
+      [
+       "Cemetery",
+       "15,000 to 100,000",
+       "25 acres"
+      ],
+      [
+       "Funeral home",
+       "-",
+       "Min 1 acre; 300 m from houses; max 10 bodies"
+      ],
+      [
+       "Crematorium",
+       "District",
+       "2.5 to 6.2 acres; 300 m from houses; parking for 25"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cz",
+   "code": "CZ",
+   "name": "Protected coastal / waterfront zone and river buffers",
+   "group": "Coastal and conservation",
+   "fill": "#20B2AA",
+   "page": 60,
+   "intent": "Land beside beaches, lagoons, rivers and lakes with protected status. Areas at risk of erosion or sea-level rise are kept free of development.",
+   "permitted": [
+    "Tourism and recreation",
+    "Traditional cottage industries, crafts, boat building",
+    "Fishing and fish processing",
+    "Public spaces"
+   ],
+   "prohibited": [
+    "Sand winning",
+    "Animal husbandry",
+    "Garages and workshops",
+    "Large markets and heavy industry",
+    "Power stations, docks",
+    "Mining",
+    "Dumping of waste",
+    "Cemeteries"
+   ],
+   "tables": [
+    {
+     "title": "Riparian buffer widths (Table 24)",
+     "head": [
+      "Water body",
+      "Buffer"
+     ],
+     "rows": [
+      [
+       "Municipal reservoir shoreline",
+       "60 to 90 m"
+      ],
+      [
+       "Major perennial river / stream",
+       "10 to 60 m"
+      ],
+      [
+       "Minor perennial stream",
+       "10 to 15 m"
+      ],
+      [
+       "Important intermittent stream",
+       "10 to 20 m"
+      ],
+      [
+       "Stream in forest reserve",
+       "10 to 50 m"
+      ],
+      [
+       "Wetland (from high-water line)",
+       "30 m"
+      ]
+     ]
+    },
+    {
+     "title": "Additions to the buffer",
+     "head": [
+      "Condition",
+      "Add"
+     ],
+     "rows": [
+      [
+       "Slope 15 to 20%",
+       "3 m"
+      ],
+      [
+       "Slope 20 to 25%",
+       "10 m"
+      ],
+      [
+       "Slope 25 to 30%",
+       "20 m"
+      ],
+      [
+       "Hazardous / petroleum storage nearby",
+       "30 m"
+      ],
+      [
+       "Landfill or junkyard nearby",
+       "20 m"
+      ],
+      [
+       "Feedlot or chemical farming nearby",
+       "20 m"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ca",
+   "code": "CA",
+   "name": "Conservation zone",
+   "group": "Coastal and conservation",
+   "fill": "#32CD32",
+   "page": 61,
+   "intent": "Kept in a natural state: forest reserves, scenic, cultural or archaeological sites, habitats, water catchments, steep hills, slopes and fault lines. Access is restricted.",
+   "permitted": [
+    "Eco-tourism and recreation",
+    "Ecosystem services",
+    "Washrooms, local crafts, staff housing",
+    "Education and research centres",
+    "Limited local transport",
+    "Afforestation"
+   ],
+   "prohibited": [
+    "Housing",
+    "Industry",
+    "Terminals and bus stops",
+    "Intensive agriculture",
+    "Animal husbandry",
+    "Dumping of waste"
+   ]
+  },
+  {
+   "id": "tl",
+   "code": "TL",
+   "name": "Transportation and logistics zone",
+   "group": "Transport and roads",
+   "fill": "#D6D6D6",
+   "pc": "#000000",
+   "hatch": "cross",
+   "page": 63,
+   "img": [
+    "p077_0.jpg"
+   ],
+   "cap": "Transport and logistics (LUSPA, 2025)",
+   "intent": "Airports, ports, railway stations, major taxi and bus terminals, freight and warehousing. Access only through controlled junctions. No housing.",
+   "permitted": [
+    "Airports, ports, rail stations",
+    "Freight and goods transfer terminals",
+    "Bus stations, road transport terminals",
+    "Warehousing, manufacturing",
+    "Car parks, shops, canteen, toilets"
+   ],
+   "prohibited": [
+    "Housing",
+    "Industrial development",
+    "Institutions",
+    "Sports and recreation",
+    "Animal husbandry"
+   ]
+  },
+  {
+   "id": "roads",
+   "code": "TL",
+   "name": "Road reservations (rights of way)",
+   "group": "Transport and roads",
+   "fill": "#D6D6D6",
+   "page": 64,
+   "intent": "Mandatory reservation widths. Cul-de-sacs must not exceed 200 m and need a T-head of 24 m.",
+   "tables": [
+    {
+     "title": "Table 26: road reservation standards",
+     "head": [
+      "Road",
+      "Right of way",
+      "Carriageway",
+      "Other",
+      "Max incline"
+     ],
+     "rows": [
+      [
+       "Motorway / expressway",
+       "90 m",
+       "7.3 m x 2",
+       "Median 5 to 10 m; shoulder 3 m x 2",
+       "6%"
+      ],
+      [
+       "National road",
+       "90 m",
+       "3.65 m x 2",
+       "Shoulder 2.5 m x 2; layby 3.5 m x 2",
+       "8%"
+      ],
+      [
+       "Inter-regional / regional",
+       "60 m",
+       "3.5 m x 2",
+       "Shoulder 2.5 m x 2; layby 3.5 m x 2",
+       "8%"
+      ],
+      [
+       "Major arterial",
+       "90 m",
+       "11 m x 2 (3 lanes)",
+       "Median 2 m x 2; walk / cycle 3.5 m x 2; sidewalk 6 m x 2",
+       "6%"
+      ],
+      [
+       "Minor arterial",
+       "40 to 60 m",
+       "7.3 m x 2",
+       "Median 2 m x 2; sidewalk 5 m x 2",
+       "8%"
+      ],
+      [
+       "Collector",
+       "20 to 45 m",
+       "3.65 m x 2",
+       "Walk / cycle 3.5 m x 2; sidewalk 5 m x 2",
+       "8%"
+      ],
+      [
+       "Local road",
+       "18 to 30 m",
+       "3.65 m x 2",
+       "Walk / cycle 3.5 m x 2",
+       "10%"
+      ],
+      [
+       "Cul-de-sac",
+       "12 m (T-head 24 m)",
+       "3.0 m x 2",
+       "Max length 200 m",
+       "12.5%"
+      ],
+      [
+       "Footpath",
+       "6 m",
+       "-",
+       "-",
+       "-"
+      ],
+      [
+       "District feeder",
+       "30 m",
+       "3.0 m x 2",
+       "-",
+       "10%"
+      ],
+      [
+       "Community road",
+       "15 m",
+       "2.5 m x 2",
+       "-",
+       "12.5%"
+      ]
+     ]
+    },
+    {
+     "title": "Corner truncations (sight lines)",
+     "head": [
+      "Road",
+      "Truncation from the intersection"
+     ],
+     "rows": [
+      [
+       "Local access and cul-de-sac",
+       "3.5 m"
+      ],
+      [
+       "Collector",
+       "5 m"
+      ],
+      [
+       "Major arterial",
+       "10 m"
+      ]
+     ]
+    }
+   ],
+   "std": [
+    [
+     "Access way, 1 plot",
+     "Min 3 m"
+    ],
+    [
+     "Access way, several plots",
+     "+1.5 m per plot, max 6 m; max 6 plots"
+    ],
+    [
+     "Private road",
+     "Min 12 m; max 15 houses"
+    ],
+    [
+     "Easements",
+     "Min 3 m each side of a service line"
+    ],
+    [
+     "Drain reserves",
+     "Primary 1:50 yr flood; secondary 1:30; tertiary 1:10"
+    ],
+    [
+     "EV charging",
+     "Min plot 0.025 acre; bay 5 x 2.5 m"
+    ],
+    [
+     "Aviation",
+     "Airspace permit for structures over 10 m within 5 km of an aerodrome, or 46 m+ anywhere"
+    ]
+   ]
+  },
+  {
+   "id": "li",
+   "code": "LI",
+   "name": "Light industrial zone",
+   "group": "Industrial",
+   "fill": "#E8BEFF",
+   "page": 69,
+   "img": [
+    "p083_0.jpg"
+   ],
+   "cap": "Industrial zone (LUSPA, 2025)",
+   "intent": "Clean, low-impact industry: electronics, IT, jewellery, medical products, agro-industry, LPG filling plants.",
+   "permitted": [
+    "Low-polluting and service industry",
+    "Ancillary shop / office (max 500 m2 or 70% of floor)",
+    "Clinics, child care, canteens",
+    "Government agency offices",
+    "Parking, limited transport",
+    "Small parks (under 20% of area)",
+    "Gas filling station"
+   ],
+   "prohibited": [
+    "Industry that is not light industry",
+    "Terminals",
+    "Unrelated institutions",
+    "Animal husbandry",
+    "Major commercial activity"
+   ],
+   "std": [
+    [
+     "Zone size",
+     "Min 10 acres"
+    ],
+    [
+     "Min plot",
+     "1 acre; cottage industry 0.5 acre"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m; side and rear 3 m"
+    ],
+    [
+     "Services",
+     "Water, power, fire fighting, first aid, waste collection, security"
+    ]
+   ]
+  },
+  {
+   "id": "si",
+   "code": "IS",
+   "name": "Service industrial zone",
+   "group": "Industrial",
+   "fill": "#EE82EE",
+   "page": 72,
+   "intent": "Small-scale repair, servicing and processing (workshops, dry cleaning, tailoring, motor trade) supporting nearby commercial and residential areas. Business floor area capped at 250 m2; shop-front look on the street; off-street parking.",
+   "permitted": [
+    "Emergency services depot",
+    "Service industry, service station, motor trading",
+    "Clinics, child care",
+    "Car park, limited transport",
+    "Markets for the zone, parks"
+   ],
+   "prohibited": [
+    "Non-service industry",
+    "Terminals",
+    "Unrelated institutions",
+    "Animal husbandry",
+    "Major commercial activity",
+    "Sports, schools"
+   ],
+   "std": [
+    [
+     "Zone size",
+     "Min 10 acres"
+    ],
+    [
+     "Min plot",
+     "1 acre"
+    ],
+    [
+     "Setbacks",
+     "Front 6 m; side and rear 3 m"
+    ],
+    [
+     "Business floor area",
+     "Max 250 m2"
+    ]
+   ]
+  },
+  {
+   "id": "hi",
+   "code": "IH",
+   "name": "Heavy industrial zone",
+   "group": "Industrial",
+   "fill": "#DF73FF",
+   "page": 73,
+   "intent": "Large manufacturing, power plants, refineries, cement, chemicals, steel. Incompatible with housing. Full EIA required.",
+   "permitted": [
+    "Warehousing, general industry",
+    "Ancillary uses",
+    "Public space, parking",
+    "Emergency services, fire, police"
+   ],
+   "prohibited": [
+    "Everything not listed as permitted"
+   ],
+   "std": [
+    [
+     "Zone size",
+     "Min 50 acres"
+    ],
+    [
+     "Min plot",
+     "10 acres"
+    ],
+    [
+     "Approval",
+     "Detailed EIA before planning approval"
+    ]
+   ]
+  },
+  {
+   "id": "ei",
+   "code": "IE",
+   "name": "Extractive industrial zone",
+   "group": "Industrial",
+   "fill": "#800080",
+   "page": 74,
+   "intent": "Quarrying and winning of rock, gravel, sand, clay and minerals, with minimal impact on settlements. Rehabilitate and rezone after use.",
+   "permitted": [
+    "Ancillary brick, tile and block making",
+    "Public space",
+    "Staff housing beyond 500 m of the blasting zone",
+    "Afforestation, animal husbandry",
+    "Waste disposal (subject to EIA)"
+   ],
+   "prohibited": [
+    "Commercial buildings",
+    "Schools",
+    "Everything not listed as permitted"
+   ],
+   "std": [
+    [
+     "Quarry distance",
+     "Min 500 m from the nearest settlement"
+    ]
+   ]
+  },
+  {
+   "id": "t",
+   "code": "T",
+   "name": "Tourist and heritage zones",
+   "group": "Tourism and heritage",
+   "fill": "#FF0080",
+   "page": 76,
+   "img": [
+    "p090_0.jpg"
+   ],
+   "cap": "Tourist / heritage zone (LUSPA, 2025)",
+   "intent": "Planned tourist accommodation and entertainment that blends with its setting, with ample parking. Heritage zones (e.g. James Town, Osu, Adum) keep their identity: some standards may be relaxed when re-planning them.",
+   "permitted": [
+    "Tourist accommodation, housing",
+    "Car parks",
+    "Cottage industry, artefact shops",
+    "Restaurants, bars, entertainment",
+    "Parks and gardens, public seats, washrooms",
+    "Security",
+    "Heritage: any use that keeps the area's identity"
+   ],
+   "prohibited": [
+    "Industry",
+    "Major commercial centre",
+    "Warehousing",
+    "Animal husbandry, slaughterhouse",
+    "Heritage: any use that reduces the area's value"
+   ]
+  },
+  {
+   "id": "su",
+   "code": "SU",
+   "name": "Special / utility zone",
+   "group": "Utilities and services",
+   "fill": "#FF7F7F",
+   "pc": "#000000",
+   "hatch": "diag",
+   "page": 78,
+   "img": [
+    "p092_0.jpg"
+   ],
+   "cap": "Utility zone (LUSPA, 2025)",
+   "intent": "Telecommunications, water, gas, power and sanitation, including waste disposal. All activities need an Environmental Impact Statement.",
+   "permitted": [
+    "Utility sites, power plants, substations",
+    "Dams and waterworks",
+    "Waste disposal, compost, landfill",
+    "Public toilets",
+    "Cemeteries, crematoria, funeral homes",
+    "Communication centres, car park, gas station"
+   ],
+   "prohibited": [
+    "Everything not listed as permitted"
+   ],
+   "tables": [
+    {
+     "title": "Sanitation, waste and post",
+     "head": [
+      "Facility",
+      "Catchment",
+      "Site",
+      "Location"
+     ],
+     "rows": [
+      [
+       "Public toilet",
+       "1 seat per 50 people (min 8 seats)",
+       "Min 50 m2",
+       "30 m from water; 3 m from roads; within 0.5 km of each other in busy areas"
+      ],
+      [
+       "Refuse transfer / depot",
+       "30,000+",
+       "Min 5 acres",
+       "Within 5 km of town"
+      ],
+      [
+       "Final waste disposal",
+       "District",
+       "Min 10 acres",
+       "10 to 30 km from town"
+      ],
+      [
+       "Sewage treatment",
+       "District",
+       "Min 5 acres",
+       "500 m from populated areas"
+      ],
+      [
+       "Recycling plant",
+       "District",
+       "Min 5 acres",
+       "500 m from populated areas"
+      ],
+      [
+       "Water treatment plant",
+       "-",
+       "-",
+       "1 km from nearest buildings"
+      ],
+      [
+       "General post office",
+       "Up to 35,000",
+       "1.2 to 4.9 acres",
+       "Near town centre"
+      ],
+      [
+       "Postal agency",
+       "Neighbourhood",
+       "Min 400 m2",
+       "Good access to main road"
+      ]
+     ]
+    },
+    {
+     "title": "Power, water and gas",
+     "head": [
+      "Item",
+      "Standard"
+     ],
+     "rows": [
+      [
+       "High-tension line reserve",
+       "No building: 50 m each side of the pylon centre line, or 15 m from the pylon edge, whichever is larger"
+      ],
+      [
+       "Overhead line clearance",
+       "Min 5 m; poles 2 m from street edge"
+      ],
+      [
+       "Street lights",
+       "38 to 45 m apart in built-up areas; 50 to 55 m on highways"
+      ],
+      [
+       "Gas pipeline right of way",
+       "15 to 35 m; buildings min 57.5 m from centre line"
+      ],
+      [
+       "Water demand",
+       "60 / 90 / 120 litres per person per day (low / middle / high income)"
+      ],
+      [
+       "Standpipe",
+       "30 to 45 l per person per day; max walk 400 m; 3 m from roads"
+      ]
+     ]
+    },
+    {
+     "title": "Telecom masts",
+     "head": [
+      "Zone",
+      "Max height",
+      "Setback / rule"
+     ],
+     "rows": [
+      [
+       "Residential",
+       "35 to 40 m (rooftop 15 m)",
+       "Lattice 12 m, monopole 5 m; consult residents within 150 m"
+      ],
+      [
+       "Mixed use",
+       "Up to 60 m",
+       "Consult neighbours within 100 m"
+      ],
+      [
+       "Education / health",
+       "-",
+       "Not on site; at least 150 m from classrooms, dormitories or wards"
+      ],
+      [
+       "Commercial / industrial",
+       "Under 120 m",
+       "Plot min 12.5 x 12.5 m"
+      ],
+      [
+       "Sharing",
+       "-",
+       "Co-location first; search radius 300 to 400 m"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "se",
+   "code": "SE",
+   "name": "Emergency zone",
+   "group": "Emergency and security",
+   "fill": "#E60000",
+   "page": 89,
+   "img": [
+    "p103_0.jpg"
+   ],
+   "cap": "Emergency and security zone (LUSPA, 2025)",
+   "intent": "Emergency services, hospitals, mortuaries, fire and ambulance stations. EIA required.",
+   "permitted": [
+    "Emergency and civil emergency facilities",
+    "Hospital, mortuary, funeral home",
+    "Fire station, ambulance station"
+   ],
+   "prohibited": [
+    "Industry",
+    "Commercial development",
+    "Housing other than ancillary"
+   ],
+   "tables": [
+    {
+     "title": "Fire service",
+     "head": [
+      "Facility",
+      "Catchment",
+      "Min site"
+     ],
+     "rows": [
+      [
+       "Fire station / fire post",
+       "Up to 35,000 people",
+       "200 m2 (3 fire tenders)"
+      ],
+      [
+       "District fire station",
+       "15 to 30 km radius or 140,000 people",
+       "500 m2"
+      ],
+      [
+       "Divisional fire command",
+       "560,000 people",
+       "1,000 m2"
+      ],
+      [
+       "Hydrants",
+       "Every 100 m on major roads",
+       "Min 15 m from buildings"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sz",
+   "code": "SZ",
+   "name": "Security zone: police, prisons, military",
+   "group": "Emergency and security",
+   "fill": "#FF7F7F",
+   "pc": "#000000",
+   "hatch": "horiz",
+   "page": 89,
+   "intent": "Police, fire, prisons and military facilities with staff housing, parade grounds, workshops, schools, clinics and worship.",
+   "permitted": [
+    "Offices and staff housing",
+    "Parade grounds, sports, messes",
+    "Medical, education, worship",
+    "Workshops, shops, prison farms",
+    "Conference halls, landing sites"
+   ],
+   "tables": [
+    {
+     "title": "Police (Table 40, acres)",
+     "head": [
+      "Facility",
+      "Rural",
+      "Urban",
+      "Regional"
+     ],
+     "rows": [
+      [
+       "Police station / barracks",
+       "2.5",
+       "3",
+       "3.5"
+      ],
+      [
+       "District HQ",
+       "-",
+       "2",
+       "2"
+      ],
+      [
+       "District HQ with barracks",
+       "4.3",
+       "5",
+       "7"
+      ],
+      [
+       "Divisional HQ",
+       "2",
+       "2.2",
+       "2.5"
+      ],
+      [
+       "Regional HQ and barracks",
+       "-",
+       "-",
+       "12.4"
+      ],
+      [
+       "Police training school",
+       "-",
+       "-",
+       "25"
+      ]
+     ]
+    },
+    {
+     "title": "Prisons",
+     "head": [
+      "Type",
+      "Urban / peri-urban",
+      "Rural"
+     ],
+     "rows": [
+      [
+       "Remand prison",
+       "10 to 15 acres",
+       "15 to 20 acres"
+      ],
+      [
+       "Camp prison",
+       "20 to 40 acres",
+       "60 to 200 acres"
+      ],
+      [
+       "Medium security",
+       "30 to 60 acres",
+       "50 to 80 acres"
+      ],
+      [
+       "Maximum security",
+       "60 to 90 acres",
+       "80 to 120 acres"
+      ],
+      [
+       "Buffer strip",
+       "30 m",
+       "50 to 100 m"
+      ]
+     ]
+    },
+    {
+     "title": "Military (acres)",
+     "head": [
+      "Facility",
+      "Area"
+     ],
+     "rows": [
+      [
+       "Base camp (rural)",
+       "10"
+      ],
+      [
+       "Detachment base",
+       "60"
+      ],
+      [
+       "Forward operating base",
+       "100"
+      ],
+      [
+       "Battalion / brigade HQ",
+       "300"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ag",
+   "code": "Ag",
+   "name": "Agricultural zones (urban, peri-urban, rural)",
+   "group": "Agriculture and rural",
+   "fill": "#ADFF2F",
+   "page": 97,
+   "img": [
+    "p111_0.jpg"
+   ],
+   "cap": "Agricultural zone (LUSPA, 2025)",
+   "intent": "Areas where farming is the main use. Urban agriculture (Ag A) also protects open spaces from encroachment and flooding; rural agriculture (Ag C) protects high-quality soils.",
+   "tables": [
+    {
+     "title": "Agriculture sub-zones",
+     "head": [
+      "Zone",
+      "Catchment",
+      "Site",
+      "Main uses",
+      "Not allowed"
+     ],
+     "rows": [
+      [
+       "Ag A: urban",
+       "Above 5,000",
+       "0.1 to 2 acres",
+       "Backyard, rooftop, institutional gardens; poultry, fish farming, agro-processing",
+       "Large industry, mechanised farming, large animal rearing"
+      ],
+      [
+       "Ag B: peri-urban",
+       "Below 5,000",
+       "2 acres or more",
+       "Small-scale farming, tree crops, houses, cottage industry",
+       "Intensive housing, mass transport, large warehouses"
+      ],
+      [
+       "Ag C: rural",
+       "Max 500",
+       "Over 5 acres",
+       "Intensive cultivation, animal husbandry, plantations, farmhouses",
+       "Housing over 10% of land, large commercial, extraction"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ru",
+   "code": "Ru A",
+   "name": "Rural zones",
+   "group": "Agriculture and rural",
+   "fill": "#ADFF2F",
+   "pc": "#000000",
+   "hatch": "dots",
+   "page": 100,
+   "img": [
+    "p114_0.jpg"
+   ],
+   "cap": "Rural zone (LUSPA, 2025)",
+   "intent": "Ru A: low-intensity farming on fragile land near towns; protects water catchments and controls erosion and flooding; no urban sprawl. Ru B: intensive farming, plantations and forestry further out.",
+   "permitted": [
+    "Low-intensity farming, forestry, horticulture",
+    "Detached / compound houses, farm houses",
+    "Public open space, community facilities",
+    "Cottage industry, small silos",
+    "Ru B: plantations, nurseries, irrigation, hotel, filling station"
+   ],
+   "prohibited": [
+    "Large industry and commercial development",
+    "Large transport facilities",
+    "Massive housing development",
+    "Unregulated mining (galamsey)",
+    "Extraction except with EIA (Ru A)"
+   ]
+  },
+  {
+   "id": "site",
+   "code": "",
+   "name": "General site rules",
+   "group": "General site rules",
+   "fill": "#FFFFFF",
+   "edge": "#555555",
+   "page": 102,
+   "std": [
+    [
+     "Landscaping",
+     "Min 2 m planted strip along major road frontages"
+    ],
+    [
+     "Walls and fences",
+     "Max 2 m high, inside the property boundary"
+    ],
+    [
+     "Pools, septic tanks, reservoirs",
+     "Min 1.5 m from boundary; septic tank min 10 m from a water reservoir"
+    ],
+    [
+     "External toilets",
+     "Min 2 m from side or rear boundary; 3 m from street boundary"
+    ],
+    [
+     "Fire safety",
+     "Public, commercial and industrial buildings need fire equipment and escapes (GNFS)"
+    ],
+    [
+     "Energy",
+     "Energy-efficient, climate-responsive design required for a permit"
+    ],
+    [
+     "Change of use",
+     "Must be a permissible use in the zone, keep the plan's intent, and not overload services or disturb neighbours"
+    ],
+    [
+     "Rezoning",
+     "Prepared by a professional planner; approved by the Spatial Planning Committee (L.I. 2384)"
+    ]
+   ]
+  }
+ ]
+}

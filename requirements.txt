@@ -1,0 +1,21 @@
+# Python 3.12
+geopandas==1.2.0
+shapely==2.2.0
+pyogrio==0.13.0
+pyproj==3.8.0
+rasterio==1.5.2
+numpy==2.5.4
+pandas==3.1.1
+scipy==1.18.1
+scikit-learn==1.9.1
+scikit-image==0.26.0
+networkx==3.7
+matplotlib==3.11.2
+opencv-python-headless==5.0.0.93
+pillow==13.0.0
+requests==2.34.2
+mercantile==1.2.1
+Flask==3.0.3
+# image detection of buildings (existing-situation "full" route only)
+torch==2.15.0
+segment_anything==1.0
