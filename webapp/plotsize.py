@@ -75,7 +75,7 @@ def to_fc(r):
 
 
 def apply(work, fids, whole, breadth, length, mode, history=None):
-    """write the re-plotted blocks into plots_landuse (and the open pieces into reserves_landuse as landscaped green)"""
+    """write the re-plotted blocks into plots_landuse; the open pieces left by an exact plot size go into the same layer, unallocated"""
     import geopandas as gpd, pandas as pd, time
     r = compute(work, fids, whole, breadth, length, mode)
     P, res = r['P'], r['res']
@@ -95,11 +95,9 @@ def apply(work, fids, whole, breadth, length, mode, history=None):
     newp = gpd.GeoDataFrame(rows, geometry='geometry', crs=P.crs) if rows else P.iloc[:0]
     P = P.drop(index=res.index)
     P = gpd.GeoDataFrame(pd.concat([P, newp], ignore_index=True), crs=P.crs)
+    if r['open']:                                                       # one land-use layer: the leftover strips stay visible for the planner to assign
+        P = gpd.GeoDataFrame(pd.concat([P, gpd.GeoDataFrame(dict(use=[''] * len(r['open']), label=['Unallocated (exact plot size leftover)'] * len(r['open']), kind=['site'] * len(r['open'])), geometry=r['open'], crs=P.crs)], ignore_index=True), crs=P.crs)
     P = P[~P.geometry.is_empty & (P.area > 300)].reset_index(drop=True); P['area'] = P.area
     if 'chamfered' in P: P['chamfered'] = P['chamfered'].fillna(0)
     P.to_file(fp)
-    if r['open'] and os.path.exists(fr):
-        R = gpd.read_file(fr)
-        S_ = gpd.GeoDataFrame(dict(use=['GRN'] * len(r['open']), label=['Landscaped green (plot size leftover)'] * len(r['open'])), geometry=r['open'], crs=R.crs)
-        R = gpd.GeoDataFrame(pd.concat([R, S_], ignore_index=True), crs=R.crs); R.to_file(fr)
     return r['stats']

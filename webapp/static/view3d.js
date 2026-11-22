@@ -55,7 +55,9 @@ const View3D = (() => {
     try {
       const L_ = k => LAYER_INDEX.find(l => l.kind === k);
       const plots = L_('plots') || L_('plots_design'), design = !L_('plots') && !!L_('plots_design'), roads = L_('roads');
-      const [sc, pf, rf] = await Promise.all([api(`/api/projects/${P.id}/scene3d`), plots ? gj(plots.path) : null, roads ? gj(roads.path) : null]);
+      const sites = design ? L_('reserves') : null;                // facility / open-space sites (P.O.S, schools on leftover land ...) live in their own layer
+      const [sc, pf, rf, sf] = await Promise.all([api(`/api/projects/${P.id}/scene3d`), plots ? gj(plots.path) : null, roads ? gj(roads.path) : null, sites ? gj(sites.path) : null]);
+      if (pf && sf) pf.features.push(...sf.features.filter(f => f.properties && f.properties.use && f.properties.use !== 'DROP'));
       if (pf) { pf.features.forEach(f => f.properties._col = colOf(design ? f.properties.use : f.properties.ex_use, design));
         m.addSource('plots', { type: 'geojson', data: pf });
         m.addLayer({ id: 'plots', type: 'fill', source: 'plots', paint: { 'fill-color': ['get', '_col'], 'fill-opacity': .55 } });

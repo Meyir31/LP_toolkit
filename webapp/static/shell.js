@@ -170,7 +170,11 @@
   function fillScale() { const s = Math.round(mpp() / 0.00028); sc.innerHTML = `<option value="">1:${s.toLocaleString()}</option>` + PRE.map(v => `<option value="${v}">1:${v.toLocaleString()}</option>`).join(''); sc.value = ''; }
   sc.onchange = () => { const v = +sc.value; if (!v) return; map.setZoom(Math.round(Math.log2(40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * v * 0.00028)))); };
   map.on('zoomend moveend', fillScale); fillScale();
-  const xy = $1('#sbXY'); map.on('mousemove', e => { const { lat, lng } = e.latlng; xy.textContent = `${Math.abs(lat).toFixed(6)}° ${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lng).toFixed(6)}° ${lng >= 0 ? 'E' : 'W'}`; });
+  const xy = $1('#sbXY'); map.on('mousemove', e => { const { lat, lng } = e.latlng; let t = `${Math.abs(lat).toFixed(6)}° ${lat >= 0 ? 'N' : 'S'}  ${Math.abs(lng).toFixed(6)}° ${lng >= 0 ? 'E' : 'W'}`;
+    const c = (typeof P !== 'undefined' && P && +P.crs) || 2136, def = (window.CRS_LIST || []).find(x => x.code === c);
+    if (window.proj4 && def && def.units !== 'degrees') { try { const [x_, y_] = proj4('EPSG:4326', 'EPSG:' + c, [lng, lat]); t += `   |   EPSG:${c}  E ${x_.toFixed(1)}  N ${y_.toFixed(1)} ${def.units === 'feet' ? 'ft' : 'm'}`; } catch (er) {} }
+    else if (def && c !== 4326) t += `   |   EPSG:${c} (geographic)`;
+    xy.textContent = t; });
   setInterval(() => {
     let n = 0; try { const s = typeof FE !== 'undefined' && FE.selection(); n = s ? s.layers.length : 0; } catch (e) {}
     $1('#sbSel').textContent = `Selected features: ${n}`;

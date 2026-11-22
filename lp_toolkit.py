@@ -213,6 +213,303 @@ def facility_site_shapes(ctx, blocks=None):
             if poly is None: side = A ** 0.5; poly = shapely.box(p.x - side / 2, p.y - side / 2, p.x + side / 2, p.y + side / 2)
         out.append(dict(fid=fid, name=FAC_BY_ID[fid]['name'], use=FAC_BY_ID[fid]['use'], size=size, geometry=poly))
     return out
+# ---------------------------------------------------------------------------------------------------------------------
+# SUITABILITY: where a facility could go (user 2026-11-22). Scores every 25 ft cell of the site from the site analysis
+# (slope, high / low ground, streams, steep reserve) and the planning standards (road access by class, distance rules from
+# LUSPA 2025 and the study of the local plans), then picks the best sites of the required size: squares on the bare site
+# before the roads, compact plot groups once a plan exists. The planner accepts or rejects each suggestion in the web app.
+# ---------------------------------------------------------------------------------------------------------------------
+SUIT_RULES = {   # facility id -> extra rules: (kind, other facility labels (regex), distance ft, hard?) ; kind: away = keep at least d from
+    'fuel': [('away', r'School|Day Care|Nursery|Playground', 197, True), ('away', r'Clinic|Health|Hospital|Polyclinic|Maternity|CHPS', 1640, False), ('away', r'Fuel', 984, False)],
+    'lpg': [('away', r'School|Day Care|Nursery|Clinic|Health|Hospital', 1640, True), ('away', r'Fuel', 1640, True)],
+    'clinic': [('away', r'Fuel|Market|S\.A|Cemetery|Lorry|Refuse', 1640, False)], 'chps': [('away', r'Fuel|S\.A|Cemetery|Refuse', 1640, False)],
+    'maternity': [('away', r'Fuel|S\.A|Cemetery|Refuse', 1640, False)], 'health_centre': [('away', r'Fuel|Market|S\.A|Cemetery|Refuse', 1640, False)],
+    'polyclinic': [('away', r'Fuel|Market|S\.A|Cemetery|Refuse', 1640, False)], 'district_hospital': [('away', r'Fuel|Cemetery|Refuse|Abattoir', 1640, False)],
+    'regional_hospital': [('away', r'Fuel|Cemetery|Refuse', 1640, False)], 'teaching_hospital': [('away', r'Fuel|Cemetery|Refuse', 1640, False)],
+    'basic_school': [('away', r'Fuel', 197, True), ('away', r'Telecom', 492, True)], 'primary': [('away', r'Fuel', 197, True)], 'jhs': [('away', r'Fuel', 197, True)],
+    'shs': [('away', r'Fuel', 197, True)], 'tvet': [('away', r'Fuel', 197, True)], 'day_care': [('away', r'Fuel|S\.A', 197, True)],
+    'sa': [('away', r'School|Day Care|Nursery|Clinic|Health|Playground|P\.O\.S|Market', 197, True)],
+    'cemetery': [('homes', None, 984, False)], 'funeral_home': [('homes', None, 984, False)],
+    'sewage_treatment': [('homes', None, 1640, False)], 'recycling': [('homes', None, 1640, False)], 'refuse_transfer': [('homes', None, 984, False)],
+    'water_treatment': [('homes', None, 3280, False)], 'telecom_mast': [('away', r'School|Day Care|Clinic|Health|Hospital', 492, True)],
+    'water_tank': [('away', r'School|Day Care|Clinic', 300, False)], 'worship': [('away', r'Fuel|S\.A', 197, True)], 'prison': [('homes', None, 328, False)],
+    'lorry_park': [('away', r'Clinic|Health', 984, False)],
+}
+WATER_SET = {'cemetery': 328, 'fuel': 98, 'lpg': 197, 'sewage_treatment': 328, 'refuse_transfer': 328}   # extra distance from streams (ft): cemeteries away from water, fuel 30 m ...
+FLAT = {'sports_field', 'basic_school', 'primary', 'jhs', 'shs', 'tvet', 'tertiary', 'nbh_market', 'local_market', 'large_market', 'clinic', 'health_centre', 'polyclinic',
+        'district_hospital', 'regional_hospital', 'teaching_hospital', 'lorry_park', 'transport_terminal', 'durbar', 'day_care', 'kids_playground', 'school_playground'}
+
+def suitability(proj_dir, out_dir, fid, size_ac=None, n=5, cell=25.0, rejected=None, evaluate=None):
+    """returns dict(facility, size_ac, stage, heat=dict(png, bounds), candidates=[...]) for the web app;
+    evaluate=<GeoJSON geometry, EPSG:4326>: score that one site instead (the planner moved a suggestion), snapped to the plots on a plan"""
+    import geopandas as gpd, numpy as np, shapely, re as _re, math
+    from shapely.geometry import Point, box, LineString
+    from shapely.ops import unary_union
+    from shapely import affinity
+    from scipy import ndimage
+    f = FAC_BY_ID[fid]; size = float(size_ac or f['size']); A = size * 43560; W = os.path.join(out_dir, '_work') + '/'
+    rd = lambda p: gpd.read_file(p).to_crs(2136) if os.path.exists(p) else None
+    S = rd(os.path.join(proj_dir, 'site.geojson')).union_all(); S = max(shapely.get_parts(S), key=lambda g: g.area)
+    plan = os.path.exists(W + 'plots_landuse.gpkg')
+    # ---- roads by class ----
+    MAIN, COLL, ANY = [], [], []
+    if plan and os.path.exists(W + 'layout_roads.gpkg'):
+        for c, g in zip(*[(x := gpd.read_file(W + 'layout_roads.gpkg'))['Class'], x.geometry]):
+            m_ = _re.search(r'(\d+)\s*ft', str(c)); w_ = float(m_.group(1)) if m_ else 30
+            (MAIN if w_ >= 60 else COLL if w_ >= 40 else ANY).append(g)
+    else:
+        C_ = rd(W + 'concept.gpkg')
+        if C_ is not None and 'Part' in C_:
+            for p_, g in zip(C_['Part'], C_.geometry):
+                if 'road' in str(p_).lower() and g is not None and not g.is_empty and g.area > 10: MAIN.append(g)
+        for src in (os.path.join(proj_dir, 'existing.geojson'), os.path.join(proj_dir, 'roads.geojson'), W + 'osm_roads.gpkg'):
+            G = rd(src)
+            if G is None or G.empty: continue
+            if 'waterway' in G: G = G[G['waterway'].isna()] if G['waterway'].notna().any() else G
+            for _, r in G.iterrows():
+                w_ = float(r.get('width_ft') or 0) or {'primary': 60, 'trunk': 80, 'secondary': 60, 'tertiary': 40}.get(str(r.get('highway')), 30)
+                (MAIN if w_ >= 60 else COLL if w_ >= 40 else ANY).append(r.geometry.buffer(w_ / 2))
+    MAINU = unary_union(MAIN) if MAIN else None; COLLU = unary_union(MAIN + COLL) if (MAIN or COLL) else None; ANYU = unary_union(MAIN + COLL + ANY) if (MAIN or COLL or ANY) else None
+    # ---- exclusions: stream reserve, steep reserve, road reserves (on a plan) ----
+    excl = []
+    C_ = rd(W + 'concept.gpkg')
+    if C_ is not None and 'Part' in C_:
+        excl += [g for p_, g in zip(C_['Part'], C_.geometry) if 'stream' in str(p_).lower() and g is not None and not g.is_empty]
+    for p_ in (W + 'steep_reserve.gpkg',):
+        G = rd(p_)
+        if G is not None and len(G): excl.append(G.union_all())
+    STREAM = unary_union(excl[:1]) if excl else None
+    if ANYU is not None: excl.append(ANYU)                               # road reserves (existing roads before the layout, all roads on a plan)
+    EX = unary_union(excl) if excl else None
+    # ---- other facilities (plan + located sites) and homes ----
+    others = []
+    if plan:
+        P = gpd.read_file(W + 'plots_landuse.gpkg').to_crs(2136); lab = P['label'].fillna('').astype(str)
+        others += [(l, g) for l, g in zip(lab, P.geometry) if l]
+        homes = list(P.geometry[P['use'].isin(['RE', 'RA'])].centroid)
+    else:
+        B_ = rd(W + 'buildings.gpkg'); homes = list(B_.geometry.centroid) if B_ is not None and len(B_) else []
+    FS = rd(os.path.join(proj_dir, 'facility_sites.geojson'))
+    if FS is not None and len(FS):
+        for _, r in FS.iterrows():
+            k_ = str(r.get('fac_id') or r.get('fid') or '')
+            if k_ in FAC_BY_ID: others.append((FAC_BY_ID[k_]['name'], r.geometry if r.geometry.geom_type != 'Point' else r.geometry.buffer(math.sqrt(float(r.get('size_ac') or 1) * 43560) / 2)))
+    REJ = unary_union([g.buffer(5) for g in rejected]) if rejected else None
+    # ---- grid ----
+    x0, y0, x1, y1 = S.bounds; nx, ny = int((x1 - x0) / cell) + 1, int((y1 - y0) / cell) + 1
+    xs = x0 + (np.arange(nx) + 0.5) * cell; ys = y1 - (np.arange(ny) + 0.5) * cell
+    XX, YY = np.meshgrid(xs, ys); pts = shapely.points(XX.ravel(), YY.ravel())
+    inside = shapely.contains(S, pts).reshape(ny, nx)
+    def mask_of(geom):
+        m = np.zeros((ny, nx), bool); gx0, gy0, gx1, gy1 = geom.bounds
+        j0, j1 = max(0, int((gx0 - x0) // cell)), min(nx, int((gx1 - x0) // cell) + 1); i0, i1 = max(0, int((y1 - gy1) // cell)), min(ny, int((y1 - gy0) // cell) + 1)
+        if j1 > j0 and i1 > i0: m[i0:i1, j0:j1] = shapely.contains(geom, shapely.points(XX[i0:i1, j0:j1].ravel(), YY[i0:i1, j0:j1].ravel())).reshape(i1 - i0, j1 - j0)
+        return m
+    def mscore(geom):
+        m = mask_of(geom) & np.isfinite(sc); return float(np.nanmean(sc[m])) if m.any() else np.nan
+    def dist(geom):
+        if geom is None or geom.is_empty: return np.full((ny, nx), 1e9)
+        return shapely.distance(geom, pts).reshape(ny, nx)
+    # terrain
+    slope = np.zeros((ny, nx)); elev = np.zeros((ny, nx)); has_dem = os.path.exists(W + 'dem_2136.tif')
+    if has_dem:
+        import rasterio
+        with rasterio.open(W + 'dem_2136.tif') as R_:
+            z = np.array([v[0] for v in R_.sample(zip(XX.ravel(), YY.ravel()))], float).reshape(ny, nx)
+            z[(z < -100) | (z > 9000)] = np.nan; zf = np.where(np.isnan(z), np.nanmean(z), z)
+            gy, gx = np.gradient(zf, cell * 0.3048); slope = np.hypot(gx, gy) * 100; elev = zf
+    # factors (0..1)
+    place = f['place']; FAC = {}
+    d_main, d_coll, d_any = dist(MAINU), dist(COLLU), dist(ANYU)
+    if place in ('main', 'gateway', 'edge'): acc = np.clip(1 - (np.minimum(d_main, d_coll * 1.5) - 30) / 900, 0, 1)
+    elif place == 'collector': acc = np.clip(1 - (d_coll - 30) / 700, 0, 1)
+    else: acc = np.clip(1 - (d_any - 30) / 600, 0, 1)
+    if ANYU is None: acc[:] = 0.5
+    # user 2026-11-22: where no road exists yet the road design will provide access, so access only counts where the facility needs an
+    # EXISTING main road (main / gateway / edge uses: the design adds local roads and collectors, not main roads), or a collector on a plan
+    NEED_ROAD = place in ('main', 'gateway', 'edge') or (plan and place == 'collector')
+    if not NEED_ROAD: acc = np.ones((ny, nx))
+    FAC['road access'] = acc
+    sl_w = 0.35 if fid in FLAT else 0.08 if fid in ('water_tank', 'telecom_mast') else 0.2
+    FAC['slope'] = np.clip(1 - (slope - 4) / 14, 0, 1) if has_dem else np.full((ny, nx), 0.7)
+    cen = S.centroid if not homes else Point(np.mean([p.x for p in homes]), np.mean([p.y for p in homes]))
+    d_cen = np.hypot(XX - cen.x, YY - cen.y); span = max(x1 - x0, y1 - y0) / 2
+    d_edge = dist(S.exterior)
+    # whom the site serves (user 2026-11-22): before the roads the WHOLE developable planning area (the plan and its new roads will fill it,
+    # so existing roads / houses must not pull the site to themselves); on a plan the homes. Score: short average and furthest distance to them.
+    devm = inside.copy()
+    if EX is not None: devm &= ~shapely.contains(EX, pts).reshape(ny, nx)
+    TP = np.array([[p.x, p.y] for p in homes]) if (plan and homes) else np.column_stack([XX[devm], YY[devm]])
+    if len(TP) > 400: TP = TP[np.random.default_rng(0).choice(len(TP), 400, replace=False)]
+    meanD = np.full((ny, nx), np.nan); maxD = np.full((ny, nx), np.nan)
+    if len(TP):
+        ii = np.argwhere(inside)
+        for k0 in range(0, len(ii), 3000):
+            blk_ = ii[k0:k0 + 3000]; Dm = np.hypot(XX[blk_[:, 0], blk_[:, 1]][:, None] - TP[None, :, 0], YY[blk_[:, 0], blk_[:, 1]][:, None] - TP[None, :, 1])
+            meanD[blk_[:, 0], blk_[:, 1]] = Dm.mean(1); maxD[blk_[:, 0], blk_[:, 1]] = Dm.max(1)
+    nrm = lambda a: (a - np.nanmin(a)) / max(np.nanmax(a) - np.nanmin(a), 1e-6)
+    serve = np.nan_to_num(1 - (0.6 * nrm(meanD) + 0.4 * nrm(maxD)), nan=0.0) if len(TP) else np.clip(1 - d_cen / max(span, 1), 0, 1)
+    SERVE_PLACES = ('centre', 'any', 'school', 'market', 'collector')
+    if place == 'high' and has_dem: pl = (elev - np.nanmin(elev[inside])) / max(np.nanmax(elev[inside]) - np.nanmin(elev[inside]), 1e-6)
+    elif place == 'low' and has_dem: pl = 1 - (elev - np.nanmin(elev[inside])) / max(np.nanmax(elev[inside]) - np.nanmin(elev[inside]), 1e-6)
+    elif place in ('edge', 'away'): pl = np.clip(1 - d_edge / max(span * 0.6, 1), 0, 1)
+    elif place in ('school', 'market', 'gateway'):
+        tgt = [g for l, g in others if _re.search('School' if place == 'school' else 'Market', l)]
+        pl = (0.5 * np.clip(1 - (dist(unary_union(tgt)) - 100) / 1300, 0, 1) + 0.5 * serve) if tgt else serve
+    else: pl = serve
+    FAC['location'] = pl
+    # standards: distance rules
+    score_rules = np.ones((ny, nx)); hard = np.zeros((ny, nx), bool); rule_txt = []
+    for kind, pat, dft, is_hard in SUIT_RULES.get(fid, []):
+        if kind == 'away':
+            tg = [g for l, g in others if _re.search(pat, l)]
+            if not tg: continue
+            d_ = dist(unary_union(tg))
+        else:
+            if not homes: continue
+            d_ = dist(unary_union([p.buffer(30) for p in homes]))
+        if is_hard: hard |= d_ < dft
+        else: score_rules = np.minimum(score_rules, np.clip(d_ / dft, 0, 1))
+        rule_txt.append((kind, pat, dft, is_hard, d_))
+    if fid in WATER_SET and STREAM is not None: hard |= dist(STREAM) < WATER_SET[fid]
+    same = [g for l, g in others if l.startswith(f['name'][:12])]
+    if same: score_rules = np.minimum(score_rules, np.clip(dist(unary_union(same)) / 1968, 0, 1))      # spread out: ~600 m from the same facility
+    FAC['planning rules'] = score_rules
+    WGT = {'road access': 0.3 if NEED_ROAD else 0.0, 'slope': sl_w, 'location': 0.25 if NEED_ROAD else 0.4, 'planning rules': 0.25}
+    tot = sum(WGT.values()); sc = sum(FAC[k] * WGT[k] for k in FAC) / tot * 100
+    ok = inside & ~hard
+    if EX is not None: ok &= ~shapely.contains(EX, pts).reshape(ny, nx)
+    if REJ is not None: ok &= ~shapely.contains(REJ, pts).reshape(ny, nx)
+    if fid in ('cemetery', 'sewage_treatment', 'refuse_transfer', 'recycling', 'water_treatment') and STREAM is not None: ok &= dist(STREAM) > 100
+    sc = np.where(ok, sc, np.nan)
+    # ---- heat map png (EPSG:4326 bounds of the grid) ----
+    import matplotlib; matplotlib.use('Agg'); import matplotlib.cm as cm
+    rgba = cm.RdYlGn(np.nan_to_num(sc / 100.0, nan=0)); rgba[..., 3] = np.where(np.isnan(sc), 0, 0.72)
+    import matplotlib.pyplot as _plt; png = W + f'suitability_{fid}.png'; _plt.imsave(png, rgba)
+    bb = gpd.GeoSeries([box(x0, y1 - ny * cell, x0 + nx * cell, y1)], crs=2136).to_crs(4326).total_bounds
+    # ---- candidates ----
+    def why(geom):
+        out = []; c_ = geom.representative_point(); i_ = int(np.clip((y1 - c_.y) // cell, 0, ny - 1)); j_ = int(np.clip((c_.x - x0) // cell, 0, nx - 1))
+        msk = mask_of(geom) & inside
+        if has_dem and msk.any():
+            sv = float(np.nanmean(slope[msk])); out.append((sv <= 10, f'mean slope {sv:.0f} % ({"flat" if sv <= 5 else "gentle" if sv <= 10 else "moderate" if sv <= 18 else "steep"})'))
+            if place in ('high', 'low'):
+                e_ = float(np.nanmean(elev[msk])); lo_, hi_ = np.nanmin(elev[inside]), np.nanmax(elev[inside]); pct = 100 * (e_ - lo_) / max(hi_ - lo_, 1e-6)
+                out.append(((pct >= 60) if place == 'high' else (pct <= 40), f'{"high" if pct >= 60 else "low" if pct <= 40 else "middle"} ground ({pct:.0f} % of the site\'s height range)'))
+        if not NEED_ROAD:
+            out.append((True, 'road access: every plot fronts a road' if plan else 'road access: the road design will provide it'))
+        if place in SERVE_PLACES and len(TP):
+            c__ = geom.centroid; dd_ = np.hypot(TP[:, 0] - c__.x, TP[:, 1] - c__.y) * 0.3048
+            out.append((float(dd_.max()) <= 800, f'serves {"the homes" if plan else "the whole planning area"}: average {dd_.mean():.0f} m, furthest {dd_.max():.0f} m'))
+        for lab_, U_ in ((('main road', MAINU), ('collector or main road', COLLU), ('a road', ANYU)) if NEED_ROAD else ()):
+            if U_ is not None:
+                d0 = geom.distance(U_) * 0.3048; need = place in ('main', 'gateway', 'edge') and lab_ == 'main road' or place == 'collector' and lab_ != 'a road'
+                out.append((d0 <= 15 or not need, (f'fronts the {lab_}' if d0 <= 3 else f'{d0:.0f} m from the {lab_}') + (' (should front it)' if need and d0 > 15 else ''))); break
+        for kind, pat, dft, is_hard, _ in rule_txt:
+            if kind == 'away':
+                tg = [g for l, g in others if _re.search(pat, l)]; dd = min(geom.distance(g) for g in tg) * 0.3048; nm = sorted({l for l, g in others if _re.search(pat, l)})[0]
+                out.append((dd >= dft * 0.3048, f'{dd:.0f} m from {nm}{" ..." if len({l for l, g in others if _re.search(pat, l)}) > 1 else ""} (standard {dft * 0.3048:.0f} m{", required" if is_hard else ""})'))
+            else:
+                hs_ = [p for p in homes if not geom.buffer(2).contains(p)]; dd = min(geom.distance(p) for p in hs_) * 0.3048 if hs_ else 9999
+                out.append((dd >= dft * 0.3048, f'{dd:.0f} m from the nearest homes outside the site (standard {dft * 0.3048:.0f} m)'))
+        if same: dd = min(geom.distance(g) for g in same) * 0.3048; out.append((dd >= 400, f'{dd:.0f} m from the other {f["name"]}'))
+        if fid in WATER_SET and STREAM is not None: dd = geom.distance(STREAM) * 0.3048; out.append((dd >= WATER_SET[fid] * 0.3048, f'{dd:.0f} m from the stream (standard {WATER_SET[fid] * 0.3048:.0f} m)'))
+        return [dict(ok=bool(a), text=t) for a, t in out]
+    if evaluate is not None:                                             # one site placed by the planner: snap to the plots under it (on a plan), score and explain it
+        g0 = gpd.GeoSeries([shapely.geometry.shape(evaluate)], crs=4326).to_crs(2136).iloc[0]; g = g0.intersection(S); ix = []
+        if g.is_empty or g.area < 0.2 * g0.area:
+            return dict(facility=fid, name=f['name'], size_ac=size, stage='plan' if plan else 'site', evaluate=True,
+                        candidate=dict(score=0.0, area_ac=0.0, plots=[], excluded_pct=100, reasons=[dict(ok=False, text='outside the site')], geometry=evaluate))
+        if plan:                                                         # a compact group of the required size around where it was dropped
+            pool_ = P[P['use'].isin(['RE', 'RA', ''])]; c0 = g0.centroid
+            if len(pool_):
+                bsum = pool_.groupby('block').geometry.apply(lambda d: d.area.sum()) if 'block' in pool_ else None
+                order_ = pool_.geometry.distance(c0).sort_values().index
+                seeds_ = [i for i in order_[:40] if bsum is None or bsum.get(P.at[i, 'block'], 0) >= 0.9 * A][:6] or list(order_[:3])     # the nearest blocks with room for the site
+                def grow_(seed):
+                    grp = [seed]; cur = P.geometry[seed]
+                    while cur.area < 0.9 * A:
+                        nb = pool_[(~pool_.index.isin(grp)) & (pool_.geometry.distance(cur) < 2)]
+                        if 'block' in pool_ and (nb['block'] == P.at[seed, 'block']).any(): nb = nb[nb['block'] == P.at[seed, 'block']]
+                        if nb.empty: break
+                        j_ = max(nb.index, key=lambda j: (P.geometry[j].intersection(g).area / max(P.geometry[j].area, 1)) + cur.union(P.geometry[j]).area / cur.union(P.geometry[j]).minimum_rotated_rectangle.area - P.geometry[j].centroid.distance(c0) / 2000)
+                        grp.append(j_); cur = unary_union([cur, P.geometry[j_]]).buffer(0.5).buffer(-0.5)
+                    return grp, cur
+                best_ = None
+                for k_, sd in enumerate(seeds_):                          # the first group of about the right size, nearest the drop point first
+                    grp, cur = grow_(sd)
+                    if best_ is None or abs(cur.area - A) < abs(best_[1].area - A): best_ = (grp, cur)
+                    if cur.area >= 0.8 * A: break
+                grp, cur = best_
+                ix = [int(i) for i in grp]; g = cur
+        sc_ = mscore(g) if not g.is_empty else float('nan')
+        excl_share = 1 - (mask_of(g) & np.isfinite(sc)).sum() / max(mask_of(g).sum(), 1) if not g.is_empty else 1
+        return dict(facility=fid, name=f['name'], size_ac=size, stage='plan' if plan else 'site', evaluate=True,
+                    candidate=dict(score=round(sc_, 1) if sc_ == sc_ else 0.0, area_ac=round(g.area / 43560, 2), plots=ix, excluded_pct=round(100 * excl_share), reasons=(why(g) if not g.is_empty else []),
+                                   geometry=shapely.geometry.mapping(gpd.GeoSeries([g], crs=2136).to_crs(4326).iloc[0]) if not g.is_empty else None))
+    SEP = max(1.6 * math.sqrt(A), 0.12 * math.sqrt(S.area))             # suggestions at least this far apart (ft): real alternatives, not one cluster
+    cands = []
+    if not plan:                                                       # before the roads: squares of the required size
+        side = math.sqrt(A); k = max(1, int(round(side / cell)))
+        sc0 = np.nan_to_num(sc, nan=0.0); valid = ndimage.uniform_filter(np.isfinite(sc).astype(float), k, mode='constant')
+        mean = ndimage.uniform_filter(sc0, k, mode='constant') / np.maximum(valid, 1e-6); mean[valid < 0.9] = -1
+        q = np.array(S.minimum_rotated_rectangle.exterior.coords); e1 = q[1] - q[0]; ang = math.degrees(math.atan2(e1[1], e1[0]))
+        taken = None
+        for _ in range(n * 4):
+            if len(cands) >= n: break
+            i_, j_ = np.unravel_index(np.argmax(mean), mean.shape)
+            if mean[i_, j_] <= 0: break
+            cx, cy = xs[j_], ys[i_]; g = affinity.rotate(box(cx - side / 2, cy - side / 2, cx + side / 2, cy + side / 2), ang, origin=(cx, cy)).intersection(S)
+            r_ = max(int(k * 1.6) + 1, int(SEP / cell)); mean[max(0, i_ - r_):i_ + r_ + 1, max(0, j_ - r_):j_ + r_ + 1] = -1      # alternatives spread out
+            if taken is not None and g.intersection(taken).area > 0.1 * g.area: continue
+            if g.area < 0.8 * A: continue
+            cands.append(dict(geometry=g, score=round(mscore(g), 1), plots=[]))
+            taken = g if taken is None else taken.union(g)
+    else:                                                              # on a plan: compact plot groups of the required size
+        P['s'] = [mscore(g) for g in P.geometry]
+        pool = P[P['use'].isin(['RE', 'RA', '']) & P['s'].notna()]
+        used = set()
+        if A > 2.5 * 43560 and 'block' in pool:                        # large sites: whole blocks (or two blocks side by side)
+            BL = pool.groupby('block').apply(lambda d: (unary_union(list(d.geometry)).buffer(0.5).buffer(-0.5), list(d.index), float(np.average(d['s'], weights=d.area))))
+            opts = []
+            for b_, (g, ix, s_) in BL.items():
+                if 0.75 * A <= g.area <= 1.8 * A: opts.append((s_, g, ix))
+            if len(opts) < n:
+                ks = list(BL.index)
+                for a_ in range(len(ks)):
+                    for b_ in range(a_ + 1, len(ks)):
+                        ga, gb = BL[ks[a_]][0], BL[ks[b_]][0]
+                        if ga.distance(gb) > 70 or not (0.75 * A <= ga.area + gb.area <= 1.8 * A): continue
+                        opts.append(((BL[ks[a_]][2] * ga.area + BL[ks[b_]][2] * gb.area) / (ga.area + gb.area), unary_union([ga, gb]), BL[ks[a_]][1] + BL[ks[b_]][1]))
+            for s_, g, ix in sorted(opts, key=lambda t: -t[0]):
+                if len(cands) >= n: break
+                if used & set(ix): continue
+                used.update(ix); cands.append(dict(geometry=g, score=round(s_, 1), plots=[int(x) for x in ix]))
+        for i_ in (pool['s'].sort_values(ascending=False).index if A <= 2.5 * 43560 else []):
+            if len(cands) >= n: break
+            if i_ in used: continue
+            if cands and min(P.geometry[i_].distance(c_['geometry']) for c_ in cands) < SEP * 0.6: continue
+            grp = [i_]; cur = P.geometry[i_]
+            while cur.area < 0.9 * A:
+                nb = pool[(~pool.index.isin(grp)) & (~pool.index.isin(used)) & (pool.geometry.distance(cur) < 2)]
+                if 'block' in pool: nb = nb[nb['block'] == P.at[i_, 'block']] if (nb['block'] == P.at[i_, 'block']).any() else nb
+                if nb.empty: break
+                def fit_(j):
+                    u = cur.union(P.geometry[j]); r = u.minimum_rotated_rectangle; return (u.area / r.area) + 0.2 * (P.at[j, 's'] / 100)
+                j = max(nb.index, key=fit_); grp.append(j); cur = unary_union([cur, P.geometry[j]]).buffer(0.5).buffer(-0.5)
+            if cur.area < 0.75 * A or cur.area > 1.8 * A: continue
+            fill = cur.area / cur.minimum_rotated_rectangle.area
+            if fill < 0.7: continue
+            used.update(grp)
+            cands.append(dict(geometry=cur, score=round(float(np.average(P.loc[grp, 's'], weights=P.loc[grp].area)), 1), plots=[int(x) for x in grp]))
+    cands.sort(key=lambda c: -c['score'])
+    G = gpd.GeoSeries([c['geometry'] for c in cands], crs=2136).to_crs(4326) if cands else []
+    out = []
+    for r_, (c, g4) in enumerate(zip(cands, G), 1):
+        out.append(dict(rank=r_, score=c['score'], area_ac=round(c['geometry'].area / 43560, 2), plots=c['plots'], reasons=why(c['geometry']), geometry=shapely.geometry.mapping(g4)))
+    return dict(facility=fid, name=f['name'], size_ac=size, stage='plan' if plan else 'site', terrain=has_dem, std=f['std'],
+                weights={k: round(v / tot * 100) for k, v in WGT.items() if v > 0}, heat=dict(png=os.path.relpath(png, os.path.dirname(out_dir.rstrip('/\\'))).replace('\\', '/'), bounds=[[bb[1], bb[0]], [bb[3], bb[2]]]),
+                candidates=out)
 def luspa_draw(ax, gdf, col, mapping, lw=.5, ec='#222'):
     """fill each feature with its LUSPA colour and pattern; returns {code: count}"""
     import matplotlib as mpl
@@ -527,6 +824,9 @@ def road_surface(lines, half, tol=3.0, clip=None, return_ends=False, fillet=0.0)
                     zones.append(x.buffer(-side * (4 * (hmax + half[i]) + 10), single_sided=True))
                 far = unary_union(zones) if zones else None
             if far is not None: cutaway.setdefault(i, []).append(far.difference(M))
+            # the carried-across piece may only cover the through road itself: nothing beyond its far edge reaches into the plots (user 2026-11-22)
+            beyond = [z for z in shapely.get_parts(LineString([tuple(e), q]).buffer(half[i] + 0.5, cap_style=2).difference(M.buffer(0.3))) if z.distance(Point(e)) > 1.0]   # keep the short link before the through road
+            if beyond: cutaway.setdefault(i, []).append(unary_union(beyond))
             flat[at_start] = True; log.append((i, at_start))
         if g.length < 1e-6: continue
         if not flat: pieces.append(g.buffer(half[i]))
@@ -2574,7 +2874,8 @@ def st_reserves(ctx):
         for w_, pt in ws:
             if 2.5 < w_ < lim: pins.append(dict(road=R.name.iloc[i] or R.highway.iloc[i], highway=R.highway.iloc[i], width_m=round(w_, 1), road_med_m=round(med, 1), class_min_m=MINW.get(R.highway.iloc[i], 9.0), geometry=pt))
     R['reserve_m'] = res; R.to_file(D + PFX + 'Roads_existing.shp')
-    PP = gpd.GeoDataFrame(pins, crs=2136)
+    COLS = ['road', 'highway', 'width_m', 'road_med_m', 'class_min_m']
+    PP = gpd.GeoDataFrame(pins, geometry='geometry', crs=2136) if pins else gpd.GeoDataFrame({c: [] for c in COLS}, geometry=gpd.GeoSeries([], crs=2136), crs=2136)   # a site may have no pinch point
     if len(PP):
         cl = unary_union([p.buffer(25 / FT) for p in PP.geometry]); keep = []
         for c in shapely.get_parts(cl):
@@ -2582,8 +2883,11 @@ def st_reserves(ctx):
         PP = gpd.GeoDataFrame(keep, crs=2136).reset_index(drop=True)
     PP = PP[PP.within(site)].reset_index(drop=True)
     PP['action'] = np.where(PP.width_m < 6, 'Severe: set back encroaching wall / structure; building line on redevelopment', 'Narrow: no parking, traffic calming; building line on redevelopment')
-    PP.to_file(D + PFX + 'Plan_pinch_point_actions.shp'); PP.to_file(D + PFX + 'Road_pinch_points.shp')
-    OR = gpd.GeoDataFrame(onroad, crs=2136); OR = OR[OR.within(site)]
+    if len(PP): PP.to_file(D + PFX + 'Plan_pinch_point_actions.shp'); PP.to_file(D + PFX + 'Road_pinch_points.shp')
+    else:                                                                   # nothing to show: no file (an older one from a previous run is removed)
+        for f_ in glob.glob(D + PFX + 'Plan_pinch_point_actions.*') + glob.glob(D + PFX + 'Road_pinch_points.*'): os.remove(f_)
+    OR = gpd.GeoDataFrame(onroad, geometry='geometry', crs=2136) if onroad else gpd.GeoDataFrame({'road': []}, geometry=gpd.GeoSeries([], crs=2136), crs=2136)
+    OR = OR[OR.within(site)]
     OR.to_file(D + PFX + 'Check_footprint_on_road.shp') if len(OR) else None
     print('pinch points', len(PP), PP.width_m.describe().round(1).to_dict() if len(PP) else '', '| severe (<6 m)', int((PP.width_m < 6).sum()), '| centreline samples inside a footprint (check):', len(OR))
     print(R.groupby('highway').reserve_m.median().round(1).to_dict())
@@ -2622,6 +2926,8 @@ def st_blocks(ctx):
     B = gpd.read_file(D + PFX + 'Existing_land_use_buildings.shp')
     # ---------- roads: carriageway from the realigned centrelines; footways 2 m ----------
     osm = gpd.read_file(WORK + 'osm_roads.gpkg'); fw = osm[osm.highway.isin(['footway', 'path'])]
+    RU_ = unary_union(list(R.geometry)).buffer(3 / FT)                     # footways: only those linking two roads (or long paths); dead-end stubs into a block are dropped
+    fw = fw[[(Point(g.coords[0]).within(RU_) and Point(g.coords[-1]).within(RU_)) or g.length * FT > 60 for g in fw.geometry]] if len(fw) else fw
     LN = list(R.geometry) + list(fw.geometry); HW = [max(cw, 3.0) / 2 / FT for cw in R.carriage_w] + [1.0 / FT] * len(fw)
     ROAD = road_surface(LN, HW, tol=3 / FT, clip=site, fillet=4 / FT)
     # dual carriageways: two parallel ways with the same name, 6-45 m apart -> fill the median between them
@@ -3238,7 +3544,7 @@ def st_proposals(ctx):
     from shapely.ops import unary_union, transform as shp_transform
     D = D; FT = 0.3048
     site = gpd.read_file(SITE_KML).to_crs(2136).geometry.iloc[0]
-    B = gpd.read_file(D + PFX + 'Existing_land_use_buildings.shp'); R = gpd.read_file(D + PFX + 'Roads_existing.shp'); PP = gpd.read_file(D + PFX + 'Road_pinch_points.shp')
+    B = gpd.read_file(D + PFX + 'Existing_land_use_buildings.shp'); R = gpd.read_file(D + PFX + 'Roads_existing.shp'); PP = gpd.read_file(D + PFX + 'Road_pinch_points.shp') if os.path.exists(D + PFX + 'Road_pinch_points.shp') else gpd.GeoDataFrame({'width_m': []}, geometry=gpd.GeoSeries([], crs=2136), crs=2136)
     V = gpd.read_file(D + PFX + 'Vacant_open_land.shp'); CWY = gpd.read_file(D + PFX + 'Carriageways.shp').union_all()
     POP = int(round(B[B.ex_use == 'Residential'].area.sum() * FT * FT * 1.5 / 60 * 3.4, -2))                                                                  # provisional (1.5 storeys, 60 m2 per household, 3.4 persons)
     # ---------- 1. mixed-use corridors: building frontage band along the primary / secondary roads ----------
@@ -4375,6 +4681,37 @@ def st_design_landuse(ctx):
         RDf = gpd.GeoDataFrame(pd.concat([RDf, gpd.GeoDataFrame(dict(Class=['Road reserve (island)']), geometry=[unary_union(ISLANDS)], crs=RDf.crs)], ignore_index=True), geometry='geometry', crs=RDf.crs)
         log.append(('Road islands', f'{len(ISLANDS)} pieces, {sum(g.area for g in ISLANDS) / AC:.2f} ac', 'small pieces between roads with no plot beside them: part of the road reserve'))
     RDf.to_file(OUT + 'layout_roads.gpkg')
+    # ---------- one land-use layer (user 2026-11-22): facility and open-space sites go into the plots layer with every other use ----------
+    R_ = R[(R.use != 'DROP') & ~R.geometry.is_empty].copy(); R_['kind'] = 'site'
+    P = gpd.GeoDataFrame(pd.concat([P, R_.drop(columns=[c for c in ('ac', 'fill', 'front') if c in R_.columns])], ignore_index=True), geometry='geometry', crs=P.crs)
+    P['area'] = P.area; P['kind'] = P['kind'].fillna('plot'); P['label'] = P['label'].fillna(''); P['use'] = P['use'].fillna('')
+    if 'fixed' in P: P['fixed'] = P['fixed'].fillna('')
+    R = R.iloc[0:0]                                                          # the old sites file stays, empty (older tools still open it)
+    # ---------- the planner's changes of use (web app 'Change use'): applied again to the plots now in that place (user 2026-11-22) ----------
+    ovf = os.path.join(os.path.dirname(ctx['SITE_KML']), 'use_overrides.geojson')
+    if os.path.exists(ovf):
+        try:
+            OV = gpd.read_file(ovf)
+            OV = OV.to_crs(P.crs) if len(OV) else OV
+        except Exception as ex_: OV = []; print('   use overrides unreadable:', ex_)
+        n_ok, n_miss = 0, 0
+        for _, o in (OV.iterrows() if len(OV) else []):
+            og = o.geometry
+            if og is None or og.is_empty: continue
+            hit = [i for i in P.index if P.geometry[i].intersects(og) and (P.geometry[i].intersection(og).area >= 0.5 * P.geometry[i].area or P.geometry[i].intersection(og).area >= 0.5 * og.area)]
+            if not hit: n_miss += 1; continue
+            u_, l_ = str(o.get('use') or ''), str(o.get('label') or '')
+            if u_ not in ('RE', 'RA', '') and len(hit) > 1:                     # a facility over several plots: one site again
+                ug = unary_union(list(P.loc[hit].geometry)).buffer(0.5).buffer(-0.5)
+                if ug.geom_type == 'Polygon': P.at[hit[0], 'geometry'] = ug; P = P.drop(index=hit[1:]); hit = hit[:1]
+            for i in hit:
+                P.at[i, 'use'] = u_; P.at[i, 'label'] = l_
+                if 'kind' in P: P.at[i, 'kind'] = 'plot' if u_ in ('RE', 'RA') else 'site'
+            n_ok += 1
+        P = P.reset_index(drop=True); P['area'] = P.area
+        if n_ok or n_miss:
+            print(f'   your changes of use kept: {n_ok}' + (f' ({n_miss} no longer match a plot: a new road crosses them, set them again)' if n_miss else ''), flush=True)
+            log.append(('Changes of use by the planner', f'{n_ok} kept', f'{n_miss} no longer match a plot' if n_miss else 'all applied'))
     P.to_file(OUT + 'plots_landuse.gpkg'); R.to_file(OUT + 'reserves_landuse.gpkg')
     json.dump(dict(program=program, res_plots=len(res), log=log, placed=PLACED, custom=CUSTOM), open(OUT + 'allocate.json', 'w'), indent=1)
     sf_ = OUT + 'shortfall.json'

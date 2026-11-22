@@ -19,8 +19,11 @@ def pid_alive(pid):
         import ctypes
         h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))
         if not h: return False
-        code = ctypes.c_ulong(); ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code)); ctypes.windll.kernel32.CloseHandle(h)
-        return code.value == 259
+        code = ctypes.c_ulong(); ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+        buf = ctypes.create_unicode_buffer(1024); n = ctypes.c_ulong(1024)
+        name = buf.value if ctypes.windll.kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) else ''
+        ctypes.windll.kernel32.CloseHandle(h)
+        return code.value == 259 and (not name or 'python' in os.path.basename(name).lower())     # a reused process id (another program) is not a toolkit run
     except Exception: return False
 def is_running(pid_):
     """running = started by this server and not finished, or a run recorded in project.json whose process is still alive (survives app restarts)"""
@@ -119,7 +122,9 @@ def project(pid):
     return jsonify(m)
 @app.post('/api/projects/<pid>/meta')
 def set_meta(pid):
-    m = meta(pid); m.update({k: v for k, v in request.get_json(force=True).items() if k in ('title', 'workflow', 'profile', 'stream_buffer', 'imagery', 'buildings', 'plot_w', 'plot_l')}); save_meta(pid, m); return jsonify(m)
+    m = meta(pid); m.update({k: v for k, v in request.get_json(force=True).items() if k in ('title', 'workflow', 'profile', 'stream_buffer', 'imagery', 'buildings', 'plot_w', 'plot_l', 'crs')}); save_meta(pid, m)
+    if 'crs' in request.get_json(force=True): threading.Thread(target=export_project, args=(pid,), daemon=True).start()        # the project's files in its coordinate system
+    return jsonify(m)
 @app.post('/api/projects/<pid>/upload/<kind>')
 def upload(pid, kind):
     if kind not in ('site', 'roads', 'stream', 'existing', 'zones'): abort(400)
@@ -354,7 +359,7 @@ EDITABLE = {
     'existing': [('Plots / land use', '{O}/{P}Plots_existing.shp'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp'), ('Blocks', '{O}/{P}Blocks_existing.shp'),
                  ('Road surface', '{O}/{P}Road_surface.shp'), ('Road centrelines', '{O}/{P}Roads_existing.shp'), ('Walls / fences', '{O}/{P}Walls_final.shp'),
                  ('Vacant / open land', '{O}/{P}Vacant_open_land.shp'), ('Tree belt', '{O}/{P}Tree_belt_existing.shp'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson')],
-    'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'), ('Facility / green sites', '{O}/_work/reserves_landuse.gpkg'),
+    'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'),
                ('Blocks', '{O}/_work/layout_blocks.gpkg'), ('Existing buildings', '{O}/_work/buildings.gpkg'), ('Existing roads to keep', 'existing.geojson'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson'), ('Redesign / zone areas', 'zones.geojson')],
 }
 READONLY = {'area_m2', 'frontage_m', 'depth_m', 'coverage', 'n_bld', 'main_bld', 'length_m', 'area_ac', '_fid'}
@@ -408,6 +413,27 @@ def edit_feature(pid):
     for c in one.columns:
         if c != 'geometry' and str(one[c].dtype).startswith(('datetime', 'object')): one[c] = one[c].astype(str)
     return jsonify(json.loads(one.to_json(drop_id=True)))
+def record_use_overrides(pid, g, idx, hist_file=None):
+    """the planner's change of use on the design plots: remembered (use, label, where) so re-making the plan keeps it (user 2026-11-22);
+    a snapshot of the previous list goes with the edit's undo step"""
+    import geopandas as gpd
+    of = os.path.join(pdir(pid), 'use_overrides.geojson')
+    fc = json.load(open(of, encoding='utf-8')) if os.path.exists(of) else dict(type='FeatureCollection', features=[])
+    if hist_file: json.dump(fc, open(hist_file[:-5] + '.ovr.json', 'w', encoding='utf-8'))
+    from shapely.geometry import shape, mapping
+    sub = g.loc[[i for i in idx if i in g.index]]
+    if sub.empty: return
+    sub4 = sub.to_crs(4326)
+    for (i, r), geom4 in zip(sub.iterrows(), sub4.geometry):
+        keep = []
+        for ft in fc['features']:                                        # an earlier change on the same place is replaced
+            try: old = shape(ft['geometry'])
+            except Exception: continue
+            if old.intersection(geom4).area > 0.5 * min(old.area, geom4.area): continue
+            keep.append(ft)
+        keep.append(dict(type='Feature', properties=dict(use=str(r.get('use') or ''), label=str(r.get('label') or ''), time=time.strftime('%Y-%m-%d %H:%M')), geometry=mapping(geom4)))
+        fc['features'] = keep
+    json.dump(fc, open(of, 'w', encoding='utf-8'))
 def _history(pid, rel):
     return os.path.join(pdir(pid), '_edit_history', re.sub(r'[^\w.-]+', '_', rel))
 @app.post('/api/projects/<pid>/edit/op')
@@ -424,7 +450,10 @@ def edit_op(pid):
         if not hs: return jsonify(error='nothing to undo on this layer'), 400
         if rel in ('site.geojson', 'zones.geojson', 'stream.geojson', 'roads.geojson', 'existing.geojson'): f = os.path.join(pdir(pid), rel)   # an input layer emptied by the edit (its file is gone): undo writes it again
         else: f = safe(pid, rel)
-        h = gpd.read_file(hs[-1]); _write(f, h); os.remove(hs[-1]); return jsonify(ok=True, left=len(hs) - 1)
+        h = gpd.read_file(hs[-1]); _write(f, h)
+        ov = hs[-1][:-5] + '.ovr.json'
+        if os.path.exists(ov): shutil.copy2(ov, os.path.join(pdir(pid), 'use_overrides.geojson')); os.remove(ov)
+        os.remove(hs[-1]); return jsonify(ok=True, left=len(hs) - 1)
     f, g = _edit_file(pid, rel); crs = g.crs
     to_g = lambda gj: gpd.GeoSeries([shape(gj)], crs=4326).to_crs(crs).iloc[0]
     fids = [int(x) for x in (j.get('fids') or [])]
@@ -525,6 +554,9 @@ def edit_op(pid):
     if 'area_m2' in g.columns and str(crs).endswith('2136') and _gkind(g) == 'polygon' and not f.endswith('Plots_existing.shp'): g['area_m2'] = (g.area * FT_ * FT_).round(1)
     if 'length_m' in g.columns and str(crs).endswith('2136') and _gkind(g) == 'line': g['length_m'] = (g.length * FT_).round(1)
     _write(f, g)
+    if f.replace(os.sep, '/').endswith('_work/plots_landuse.gpkg') and changed and op == 'update_attrs' and ({'use', 'label'} & set((j.get('properties') or {}).keys())):
+        try: record_use_overrides(pid, g, [c for c in changed if c < len(g)], HF)
+        except Exception as ex: print('use override not recorded:', ex)
     return jsonify(ok=True, features=len(g), changed=changed)
 @app.post('/api/projects/<pid>/run')
 def run(pid):
@@ -800,6 +832,8 @@ def status(pid):
     prog, note = {}, {}
     for mm in re.finditer(r'^@@progress (\w+) (\d+) ?(.*)$', txt, flags=re.M): prog[mm.group(1)] = int(mm.group(2)); note[mm.group(1)] = mm.group(3).strip()
     txt = re.sub(r'^@@progress .*\n?', '', txt, flags=re.M)
+    if not running and os.path.exists(f) and proj_crs(pid) != 2136 and os.path.getmtime(f) > float(meta(pid).get('exported_at') or 0) + 2:      # a run finished: refresh the export
+        m_ = meta(pid); m_['exported_at'] = time.time(); save_meta(pid, m_); threading.Thread(target=export_project, args=(pid,), daemon=True).start()
     paused = (not running) and (not failed) and bool(re.search(r'^@@pause shortfall', txt, flags=re.M)) and os.path.exists(os.path.join(outdir(pid), '_work', 'shortfall.json'))
     txt = re.sub(r'^@@pause .*\n?', '', txt, flags=re.M)
     return jsonify(running=running, log=txt[-20000:], stages=stages, finished=len(done), failed=bool(failed), returncode=rc, pending_load=pend, progress=prog, notes=note, failure=failure_summary(txt, stages, len(done)) if failed else None, paused=paused,
@@ -816,14 +850,42 @@ LAYERS = {   # (label, relative path template, kind)
                ('Slope classes', '{O}/{P}Slope_classes.shp', 'slope'), ('Contours', '{O}/{P}Contours.shp', 'contours'),
                ('Steep-slope reserve (kept green)', '{O}/{P}Steep_slope_reserve.shp', 'steep'),
                ('Road draft: grid iron', '{O}/{P}Roads_draft_grid.shp', 'draft'), ('Road draft: curvilinear', '{O}/{P}Roads_draft_curvilinear.shp', 'draft'),
-               ('Plots and land use', '{O}/_work/plots_landuse.gpkg', 'plots_design'), ('Facility / green sites', '{O}/_work/reserves_landuse.gpkg', 'reserves'),
-               ('Plots (before land use)', '{O}/_work/plots_final.gpkg', 'blocks'), ('Road reserves', '{O}/_work/layout_roads.gpkg', 'roads'),
+               ('Plots and land use', '{O}/_work/plots_landuse.gpkg', 'plots_design'),
+               ('Plots (before land use)', '{O}/_work/plots_final.gpkg', 'blocks'), ('Road reserves', '{O}/_work/layout_roads.gpkg', 'roads'), ('Road centrelines (design)', '{O}/_work/layout_centrelines.gpkg', 'lines'),
                ('Blocks', '{O}/_work/layout_blocks.gpkg', 'blocks'), ('Road draft (automatic)', '{O}/{P}Roads_draft.shp', 'draft'),
                ('Existing buildings', '{O}/_work/buildings.gpkg', 'buildings'), ('Design audit findings', '{O}/_work/design_audit.csv', 'audit')],
 }
+def merge_sites(pid):
+    """one land-use layer (user 2026-11-22): plans made before keep facility / open-space sites in reserves_landuse -> moved into plots_landuse
+    (landscaped green pieces join the plot beside them); the old file stays, empty"""
+    import geopandas as gpd, pandas as pd
+    from shapely.ops import unary_union
+    w = os.path.join(outdir(pid), '_work'); fp, fr = os.path.join(w, 'plots_landuse.gpkg'), os.path.join(w, 'reserves_landuse.gpkg')
+    if not (os.path.exists(fp) and os.path.exists(fr)): return 0
+    try:
+        R = gpd.read_file(fr)
+        if R.empty: return 0
+        P = gpd.read_file(fp); R = R.to_crs(P.crs)
+        bk = os.path.join(w, '_before_one_layer'); os.makedirs(bk, exist_ok=True)
+        for f in (fp, fr): shutil.copy2(f, bk)
+        green = R[R['use'].fillna('').isin(['GRN', '']) | R['label'].fillna('').str.contains('Landscaped', case=False)]
+        keep = R.drop(index=green.index); keep = keep.assign(kind='site').drop(columns=[c for c in ('ac', 'fill', 'front') if c in keep.columns])
+        P = gpd.GeoDataFrame(pd.concat([P, keep], ignore_index=True), geometry='geometry', crs=P.crs)
+        for g in green.geometry:                                        # no landscaped green: the piece joins the plot beside it
+            nb = P[P.geometry.buffer(1).intersection(g).area > 5]
+            if len(nb):
+                j = max(nb.index, key=lambda j: P.geometry[j].buffer(1).intersection(g).area); ug = unary_union([P.geometry[j], g]).buffer(0.3).buffer(-0.3)
+                if ug.geom_type == 'Polygon': P.at[j, 'geometry'] = ug
+        P['area'] = P.area
+        for c in ('label', 'use', 'kind'): P[c] = P[c].fillna('' if c != 'kind' else 'plot')
+        P.to_file(fp); R.iloc[0:0].to_file(fr)
+        return len(keep)
+    except Exception as ex:
+        print('merge_sites failed:', ex); return 0
 @app.get('/api/projects/<pid>/layers')
 def layers(pid):
     m = meta(pid); O = os.path.basename(outdir(pid)); P = prefix(pid); d = pdir(pid); out = []
+    if m.get('workflow') == 'design' and not is_running(pid): merge_sites(pid)
     for label, tpl, kind in LAYERS.get(m.get('workflow', 'design'), []):
         rel = tpl.format(O=O, P=P)
         if os.path.exists(os.path.join(d, rel)):
@@ -856,11 +918,139 @@ def geojson(pid):
     return jsonify(to_geojson(f, simplify_ft=0.5))
 @app.get('/api/projects/<pid>/file')
 def file(pid): return send_file(safe(pid, request.args.get('f', '')))
+# ------------------------------------------------------------------ suitability: where could a facility go (user 2026-11-22)
+_LPT = {}
+def toolkit():
+    """the toolkit module (its suitability engine and facility catalogue), loaded once"""
+    if 'm' not in _LPT:
+        if TOOLKIT not in sys.path: sys.path.insert(0, TOOLKIT)
+        import importlib; _LPT['m'] = importlib.import_module('lp_toolkit')
+    return _LPT['m']
+def _rejected(pid, fid):
+    import geopandas as gpd
+    f = os.path.join(pdir(pid), 'suit_rejected.geojson')
+    if not os.path.exists(f): return []
+    G = gpd.read_file(f)
+    if G.empty or 'fac_id' not in G: return []
+    return list(G[G['fac_id'] == fid].to_crs(2136).geometry)
+@app.post('/api/projects/<pid>/suitability')
+def suitability_api(pid):
+    j = request.get_json(force=True); fid = j.get('fid')
+    T = toolkit()
+    if fid not in T.FAC_BY_ID: return jsonify(error='unknown facility'), 400
+    if not os.path.exists(os.path.join(pdir(pid), 'site.geojson')): return jsonify(error='draw or upload the site boundary first'), 400
+    try: r = T.suitability(pdir(pid), outdir(pid), fid, size_ac=float(j.get('size_ac') or 0) or None, n=max(1, min(30, int(j.get('n') or 5))), rejected=_rejected(pid, fid))
+    except Exception as ex:
+        import traceback; traceback.print_exc(); return jsonify(error=f'suitability failed ({type(ex).__name__}: {ex})'), 500
+    return jsonify(r)
+@app.post('/api/projects/<pid>/suitability/score')
+def suitability_score(pid):
+    """the planner moved a suggestion: score and explain the site where it was dropped (snapped to the plots on a plan)"""
+    j = request.get_json(force=True); fid = j.get('fid'); T = toolkit()
+    if fid not in T.FAC_BY_ID or not j.get('geometry'): return jsonify(error='facility and geometry needed'), 400
+    try: r = T.suitability(pdir(pid), outdir(pid), fid, size_ac=float(j.get('size_ac') or 0) or None, evaluate=j['geometry'])
+    except Exception as ex:
+        import traceback; traceback.print_exc(); return jsonify(error=f'scoring failed ({type(ex).__name__}: {ex})'), 500
+    return jsonify(r['candidate'])
+@app.post('/api/projects/<pid>/suitability/accept')
+def suitability_accept(pid):
+    """the suggestion becomes a located facility; on a plan, 'apply now' also gives the plots under it that use (one undo step)"""
+    import geopandas as gpd, pandas as pd
+    from shapely.geometry import shape, mapping
+    from shapely.ops import unary_union
+    j = request.get_json(force=True); fid = j.get('fid'); T = toolkit()
+    if fid not in T.FAC_BY_ID: return jsonify(error='unknown facility'), 400
+    F_ = T.FAC_BY_ID[fid]; d = pdir(pid); g4 = shape(j['geometry'])
+    sf = os.path.join(d, 'facility_sites.geojson')
+    fc = json.load(open(sf, encoding='utf-8')) if os.path.exists(sf) else dict(type='FeatureCollection', features=[])
+    fc['features'].append(dict(type='Feature', properties=dict(fac_id=fid, name=F_['name'], size_ac=float(j.get('size_ac') or F_['size']), source='suitability'), geometry=mapping(g4)))
+    json.dump(fc, open(sf, 'w', encoding='utf-8'))
+    ff = os.path.join(d, 'facilities.json')                               # a custom programme counts it
+    if os.path.exists(ff):
+        J = json.load(open(ff, encoding='utf-8'))
+        if J.get('mode') == 'custom':
+            it = (J.setdefault('items', {})).get(fid) or dict(on=True, n=0, size_ac=F_['size'])
+            n_loc = sum(1 for x in fc['features'] if (x.get('properties') or {}).get('fac_id') == fid)
+            it['on'] = True; it['n'] = max(int(it.get('n') or 0), n_loc); J['items'][fid] = it; json.dump(J, open(ff, 'w', encoding='utf-8'), indent=1)
+    applied = 0
+    fp = os.path.join(outdir(pid), '_work', 'plots_landuse.gpkg')
+    if j.get('apply_now') and os.path.exists(fp):
+        P = gpd.read_file(fp); rel = os.path.relpath(fp, d).replace('\\', '/')
+        hd = _history(pid, rel); os.makedirs(hd, exist_ok=True); P.to_file(os.path.join(hd, time.strftime('%Y%m%d-%H%M%S-') + str(int(time.time() * 1000) % 1000) + '.gpkg'))
+        g = gpd.GeoSeries([g4], crs=4326).to_crs(P.crs).iloc[0]
+        ix = [i for i in (j.get('plots') or []) if i in P.index] or list(P.index[P.geometry.representative_point().within(g.buffer(3))])
+        ix = [i for i in ix if str(P.at[i, 'use']) in ('RE', 'RA', '')]
+        if ix:
+            u = unary_union(list(P.loc[ix].geometry)).buffer(0.5).buffer(-0.5); k = ix[0]
+            P.at[k, 'geometry'] = u; P.at[k, 'use'] = F_['use']; P.at[k, 'label'] = F_['name']
+            if 'kind' in P: P.at[k, 'kind'] = 'site'
+            P = P.drop(index=ix[1:]).reset_index(drop=True); P['area'] = P.area; P.to_file(fp); applied = len(ix)
+            try: record_use_overrides(pid, P, [int(P.index[(P['label'] == F_['name']) & (P.geometry.distance(u) < 1)][0])])
+            except Exception as ex: print('use override not recorded:', ex)
+    m = meta(pid); m['last_edit'] = time.time(); save_meta(pid, m)
+    return jsonify(ok=True, located=True, applied_plots=applied)
+@app.post('/api/projects/<pid>/suitability/reject')
+def suitability_reject(pid):
+    from shapely.geometry import shape, mapping
+    j = request.get_json(force=True); f = os.path.join(pdir(pid), 'suit_rejected.geojson')
+    fc = json.load(open(f, encoding='utf-8')) if os.path.exists(f) else dict(type='FeatureCollection', features=[])
+    fc['features'].append(dict(type='Feature', properties=dict(fac_id=j.get('fid'), time=time.strftime('%Y-%m-%d %H:%M')), geometry=mapping(shape(j['geometry']))))
+    json.dump(fc, open(f, 'w', encoding='utf-8')); return jsonify(ok=True)
+@app.post('/api/projects/<pid>/suitability/clear_rejected')
+def suitability_clear(pid):
+    f = os.path.join(pdir(pid), 'suit_rejected.geojson'); fid = request.get_json(force=True).get('fid')
+    if os.path.exists(f):
+        fc = json.load(open(f, encoding='utf-8')); fc['features'] = [x for x in fc['features'] if fid and (x.get('properties') or {}).get('fac_id') != fid]
+        json.dump(fc, open(f, 'w', encoding='utf-8'))
+    return jsonify(ok=True)
+# ------------------------------------------------------------------ project coordinate system (user 2026-11-22)
+CRS_CODES = [2136, 25000, 2137, 32630, 32631, 4168, 4250, 4326]       # every system that covers Ghana; the toolkit computes in 2136 (Ghana National Grid, ft)
+_CRSL = []
+def crs_list():
+    if not _CRSL:
+        from pyproj import CRS
+        for c in CRS_CODES:
+            k = CRS.from_epsg(c); u = k.axis_info[0].unit_name if k.axis_info else ''
+            _CRSL.append(dict(code=c, name=k.name, units=('degrees' if k.is_geographic else ('feet' if 'foot' in u.lower() else 'metres')), proj4=k.to_proj4(), area=(k.area_of_use.name if k.area_of_use else '')))
+    return _CRSL
+@app.get('/api/crs')
+def crs_api(): return jsonify(crs_list())
+def proj_crs(pid):
+    try: c = int(meta(pid).get('crs') or 2136)
+    except (TypeError, ValueError): c = 2136
+    return c if c in CRS_CODES else 2136
+EXPORT_LOCK = threading.Lock()
+def export_project(pid):
+    """every map layer of the project written again in the project's coordinate system: <outputs>/Export_EPSG<code>/ (the toolkit's own working files stay in EPSG:2136)"""
+    import geopandas as gpd
+    with EXPORT_LOCK:
+        try:
+            o = outdir(pid); c = proj_crs(pid)
+            for old in glob.glob(os.path.join(o, 'Export_EPSG*')):
+                if not old.endswith(f'Export_EPSG{c}'): shutil.rmtree(old, ignore_errors=True)
+            if c == 2136 or not os.path.isdir(o): return 0
+            ex = os.path.join(o, f'Export_EPSG{c}'); os.makedirs(ex, exist_ok=True); n = 0
+            keep_ = ('plots_landuse.gpkg', 'layout_roads.gpkg', 'layout_centrelines.gpkg', 'layout_blocks.gpkg', 'buildings.gpkg', 'plots_final.gpkg', 'concept.gpkg')
+            srcs = glob.glob(os.path.join(o, '*.shp')) + [f for f in glob.glob(os.path.join(o, '_work', '*.gpkg')) if os.path.basename(f) in keep_]
+            for f in srcs:
+                try:
+                    g = gpd.read_file(f)
+                    if g.empty: continue
+                    if g.crs is None: g = g.set_crs(2136)
+                    g.to_crs(c).to_file(os.path.join(ex, os.path.basename(f))); n += 1
+                except Exception as e_: print('export skipped', f, e_)
+            json.dump(dict(crs=c, time=time.strftime('%Y-%m-%d %H:%M'), layers=n), open(os.path.join(ex, 'export.json'), 'w'))
+            m = meta(pid); m['exported_at'] = time.time(); save_meta(pid, m)
+            return n
+        except Exception as e:
+            print('export failed', pid, e); return 0
+@app.post('/api/projects/<pid>/export')
+def export_api(pid): return jsonify(ok=True, layers=export_project(pid), crs=proj_crs(pid))
 @app.get('/api/projects/<pid>/download')
 def download(pid):
-    """the ticked outputs as one zip: map layers as shapefiles (EPSG:2136), maps / tables as they are"""
+    """the ticked outputs as one zip: map layers as shapefiles in the project's coordinate system, maps / tables as they are"""
     import geopandas as gpd, tempfile, pandas as pd
-    items = [x for x in request.args.get('items', '').split('|') if x]; d = pdir(pid); tmp = tempfile.mkdtemp(); buf = io.BytesIO()
+    items = [x for x in request.args.get('items', '').split('|') if x]; d = pdir(pid); tmp = tempfile.mkdtemp(); buf = io.BytesIO(); PC = proj_crs(pid)
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
         for it in items:
             kind, rel = it[:2], it[2:]
@@ -869,12 +1059,12 @@ def download(pid):
             base = os.path.splitext(os.path.basename(f))[0]
             if kind == 'L:':
                 if f.endswith('.csv'):
-                    t = pd.read_csv(f); g = gpd.GeoDataFrame(t.drop(columns=['x', 'y']), geometry=gpd.points_from_xy(t.x, t.y), crs=2136)
+                    t = pd.read_csv(f); g = gpd.GeoDataFrame(t.drop(columns=['x', 'y']), geometry=gpd.points_from_xy(t.x, t.y), crs=2136).to_crs(PC)
                     z.write(f, f'tables/{os.path.basename(f)}')
                 else:
                     g = gpd.read_file(f)
                     if g.crs is None: g = g.set_crs(2136)
-                    g = g.to_crs(2136)
+                    g = g.to_crs(PC)
                 for c in list(g.columns):
                     if c != 'geometry' and str(g[c].dtype) == 'object': g[c] = g[c].astype(str).str.slice(0, 250)
                 for gt in sorted(set(g.geom_type.dropna())):              # a shapefile holds one geometry type
@@ -888,11 +1078,17 @@ def download(pid):
     return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=f'{meta(pid)["name"]}_outputs.zip')
 @app.get('/api/projects/<pid>/zip')
 def zip_outputs(pid):
-    o = outdir(pid); buf = io.BytesIO()
+    o = outdir(pid); buf = io.BytesIO(); PC = proj_crs(pid)
+    if PC != 2136: export_project(pid)                                   # map layers in the project's coordinate system
+    SPATIAL = ('.shp', '.shx', '.dbf', '.prj', '.cpg')
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in glob.glob(os.path.join(o, '*')):
-            if os.path.isfile(f): z.write(f, os.path.relpath(f, o))
-        for f in glob.glob(os.path.join(o, '_work', '*.gpkg')) + glob.glob(os.path.join(o, '_work', '*.png')) + glob.glob(os.path.join(o, '_work', '*.csv')):
+            if os.path.isfile(f) and not (PC != 2136 and f.lower().endswith(SPATIAL)): z.write(f, os.path.relpath(f, o))
+        if PC != 2136:
+            for f in glob.glob(os.path.join(o, f'Export_EPSG{PC}', '*')):
+                if f.endswith('.gpkg'): z.write(f, os.path.join('design_layers', os.path.basename(f)))
+                elif os.path.isfile(f): z.write(f, os.path.basename(f))
+        for f in (glob.glob(os.path.join(o, '_work', '*.gpkg')) if PC == 2136 else []) + glob.glob(os.path.join(o, '_work', '*.png')) + glob.glob(os.path.join(o, '_work', '*.csv')):
             z.write(f, os.path.join('design_layers', os.path.basename(f)))
     buf.seek(0); return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=f'{meta(pid)["name"]}_outputs.zip')
 

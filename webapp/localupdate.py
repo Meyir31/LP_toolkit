@@ -120,6 +120,12 @@ def update(project_dir, work, log=print):
                             geometry=[q for q, _ in plots], crs=P.crs)
     newp['area'] = newp.area
     P = gpd.GeoDataFrame(pd.concat([P, newp], ignore_index=True), crs=P.crs)
+    for q in (spare or []):                                                # pieces too small for a plot join the plot beside them (one land-use layer, no green)
+        nb = P[P.geometry.buffer(1).intersection(q).area > 5]
+        if len(nb):
+            j = max(nb.index, key=lambda j: P.geometry[j].buffer(1).intersection(q).area); ug = unary_union([P.geometry[j], q]).buffer(0.3).buffer(-0.3)
+            if ug.geom_type == 'Polygon': P.at[j, 'geometry'] = ug
+    spare = []
     P = P[~P.geometry.is_empty & (P.area > 500)].reset_index(drop=True); P['area'] = P.area
     if 'chamfered' in P: P['chamfered'] = P['chamfered'].fillna(0)
     P.to_file(fp)
@@ -127,8 +133,6 @@ def update(project_dir, work, log=print):
     if R is not None and len(R):
         R['geometry'] = [g.difference(add_res.buffer(0.05)) if g.intersects(add_res) else g for g in R.geometry]
         R = R[~R.geometry.is_empty]; R['geometry'] = [max(shapely.get_parts(g), key=lambda q: q.area) if g.geom_type != 'Polygon' else g for g in R.geometry]
-        if spare:
-            S_ = gpd.GeoDataFrame(dict(use=['GRN'] * len(spare), label=['Landscaped green'] * len(spare)), geometry=spare, crs=R.crs); R = gpd.GeoDataFrame(pd.concat([R, S_], ignore_index=True), crs=R.crs)
         R.to_file(fr)
     # road reserves (by class) and centrelines
     for l, w in added:

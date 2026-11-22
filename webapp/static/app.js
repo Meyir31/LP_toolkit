@@ -49,7 +49,8 @@ function opSlider(path, onChange) {                                      // 'Tra
   const r = w.querySelector('input'); r.oninput = () => { w.querySelector('.opv').textContent = r.value + '%'; setOp(path, 1 - r.value / 100); onChange(); };
   return w;
 }
-function layerRow(L_, lab, cb) { const row = document.createElement('div'); row.className = 'lrow'; lab.append(cb, ' ' + L_.label); row.append(lab, opSlider(L_.path, () => applyOp(L_.path))); return row; }
+function zoomBtn(ref) { const z = document.createElement('button'); z.className = 'ghost lzoom'; z.title = 'Zoom to layer (or right-click the row)'; z.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5M8 10.5h5M10.5 8v5"/></svg>'; z.onclick = e => { e.preventDefault(); e.stopPropagation(); window.zoomToLayer && zoomToLayer(ref); }; return z; }
+function layerRow(L_, lab, cb) { const row = document.createElement('div'); row.className = 'lrow'; row.dataset.path = L_.path; lab.append(cb, ' ' + L_.label); row.append(lab, zoomBtn({ path: L_.path }), opSlider(L_.path, () => applyOp(L_.path))); return row; }
 function styleInput(kind, layer) {
   const p = layer.feature?.properties || {}, v = opOf('in:' + kind);
   if (kind === 'roads') layer.setStyle?.(withOp(roadStyle(+(p.width_ft || 30), p.locked), v));
@@ -218,6 +219,7 @@ async function openProject(id) {
   stopTool(); if (typeof Editor !== 'undefined') Editor.close();
   $('#confirmAlert') && ($('#confirmAlert').hidden = true); document.querySelector('.confirmbox') && (document.querySelector('.confirmbox').hidden = true); map.closePopup();
   $$('.tabs button')[0]?.click(); P = await api(`/api/projects/${id}`); P.buildings = P.buildings || 'fast'; $$('input[name=bmode]').forEach(r => r.checked = r.value === P.buildings); $('#imagery').value = P.imagery || 'google'; if ($('#profile')) $('#profile').value = P.profile || 'auto'; $('#noProj').hidden = true; $('#proj').hidden = false; $('#pName').textContent = P.name; $('#pTitle').value = P.title || '';
+  if ($('#pCrs')) $('#pCrs').value = String(P.crs || 2136);
   setWorkflow(P.workflow, false); if ($('#dPW')) { $('#dPW').value = P.plot_w || ''; $('#dPL').value = P.plot_l || ''; plotSizeChanged(false); }
   for (const k of Object.keys(inputs)) loadInput(k, await api(`/api/projects/${id}/input/${k}`));
   if (inputs.site.getLayers().length) map.fitBounds(inputs.site.getBounds());
@@ -233,6 +235,12 @@ function setWorkflow(wf, save = true) {
 }
 $$('#wfSeg button').forEach(b => b.onclick = () => setWorkflow(b.dataset.wf));
 $('#pTitle').onchange = () => post(`/api/projects/${P.id}/meta`, { title: $('#pTitle').value });
+let CRS_LIST = [];
+api('/api/crs').then(l => { CRS_LIST = l; window.CRS_LIST = l; const s = $('#pCrs'); if (!s) return;
+  s.innerHTML = l.map(c => `<option value="${c.code}">EPSG:${c.code} ${c.name} (${c.units})</option>`).join(''); if (P) s.value = String(P.crs || 2136);
+  if (window.proj4) l.forEach(c => { try { proj4.defs('EPSG:' + c.code, c.proj4); } catch (e) {} }); }).catch(() => {});
+if ($('#pCrs')) $('#pCrs').onchange = async () => { if (!P) return; P.crs = +$('#pCrs').value; try { await post(`/api/projects/${P.id}/meta`, { crs: P.crs }); const c = CRS_LIST.find(x => x.code === P.crs);
+  alert(`Coordinate system: EPSG:${P.crs} ${c ? c.name : ''}. Downloads and the zip now use it; every map layer is also written to the outputs folder Export_EPSG${P.crs}${P.crs === 2136 ? ' (not needed: the outputs are already in this system)' : ''}.`); } catch (e) { alert(e.message); } };
 $$('input[name=bmode]').forEach(r => r.onchange = () => { P.buildings = r.value; post(`/api/projects/${P.id}/meta`, { buildings: r.value }); setWorkflow(P.workflow, false); });
 $('#imagery').onchange = () => post(`/api/projects/${P.id}/meta`, { imagery: $('#imagery').value });
 function refreshInputState() { const n = k => inputs[k].getLayers().length; $('#siteState').textContent = n('site') ? 'set' : 'not set'; $('#roadsState').textContent = n('roads') ? `${n('roads')} road lines` : ''; }
@@ -434,17 +442,23 @@ async function loadResults(fresh) {
   if (!P) return; if (fresh) clearResults();
   let r; try { r = await api(`/api/projects/${P.id}/layers`); } catch { return; }
   LAYER_INDEX = r.layers;
-  const DEFAULT_ON = new Set(['plots', 'plots_design', 'reserves', 'roads']);
-  const list = r.layers.filter(l => l.kind !== 'draft');
+  const DEFAULT_ON = new Set(['plots', 'plots_design', 'reserves', 'roads', 'lines']);
+  const GROUPS = [['Land use and plots', ['plots', 'plots_design', 'blocks', 'reserves']], ['Roads', ['roads', 'lines', 'points']], ['Buildings', ['buildings', 'walls']],
+                  ['Terrain and environment', ['raster', 'slope', 'contours', 'steep', 'green']], ['Checks', ['audit']]];
+  const grpOf = k => (GROUPS.find(([, ks]) => ks.includes(k)) || ['Other'])[0];
+  const order = [...GROUPS.map(g => g[0]), 'Other'];
+  const list = r.layers.filter(l => l.kind !== 'draft').map((l, i) => ({ l, i })).sort((a, b) => order.indexOf(grpOf(a.l.kind)) - order.indexOf(grpOf(b.l.kind)) || a.i - b.i).map(x => x.l);
   $('#layerList').innerHTML = list.length ? '' : '<p class="hint">No results yet: run the toolkit first.</p>';
+  let lastG = null;
   for (const L_ of list) {
+    const gname = grpOf(L_.kind); if (gname !== lastG) { const h = document.createElement('div'); h.className = 'lgh'; h.textContent = gname; $('#layerList').append(h); lastG = gname; }
     const lab = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = DEFAULT_ON.has(L_.kind) || !!(results[L_.path] && resGroup.hasLayer(results[L_.path]));
     cb.onchange = () => toggleLayer(L_, cb.checked); $('#layerList').append(layerRow(L_, lab, cb)); if (cb.checked) toggleLayer(L_, true);
   }
   const drawn = [['site', 'Site boundary'], ['roads', 'Roads you drew'], ['reserves', 'Road reserves (drawn roads)'], ['existing', 'Existing roads to keep'], ['stream', 'Streams / water'], ['zones', 'Redesign areas']]
     .filter(([k]) => k === 'reserves' ? inputs.roads.getLayers().length || inputs.existing.getLayers().length : inputs[k].getLayers().length);
   if (drawn.length) { const h = document.createElement('div'); h.className = 'lgh'; h.textContent = 'Drawn on the map'; $('#layerList').append(h);
-    for (const [k, lab_] of drawn) { const row = document.createElement('div'); row.className = 'lrow'; const s_ = document.createElement('span'); s_.className = 'lname'; s_.textContent = lab_; row.append(s_, opSlider('in:' + k, () => applyInputOp(k))); $('#layerList').append(row); }
+    for (const [k, lab_] of drawn) { const row = document.createElement('div'); row.className = 'lrow'; row.dataset.input = k; const s_ = document.createElement('span'); s_.className = 'lname'; s_.textContent = lab_; row.append(s_, zoomBtn({ input: k }), opSlider('in:' + k, () => applyInputOp(k))); $('#layerList').append(row); }
   }
   applyInputOp('reserves');
   const kinds = new Set(list.map(l => l.kind));

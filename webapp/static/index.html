@@ -61,6 +61,7 @@
         <label class="lbl">Workflow</label>
         <div class="seg" id="wfSeg"><button data-wf="existing">Existing situation</button><button data-wf="design">New layout</button></div>
         <label class="lbl">Title on maps</label><input id="pTitle" placeholder="e.g. Test 6 (Teshie)">
+        <label class="lbl" title="Downloads, the zip and the Export folder are written in this system; the status bar shows the pointer in it. The toolkit computes in the Ghana National Grid.">Coordinate system</label><select id="pCrs"><option value="2136">EPSG:2136 Accra / Ghana National Grid (feet)</option></select>
 
         <div class="card">
           <div class="cardh">Site boundary <span id="siteState" class="mini"></span></div>
@@ -208,6 +209,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/pro.js"></script>
 <script src="/static/icons.js"></script>
@@ -220,5 +222,7 @@
 <script src="/static/standards.js"></script>
 <script src="/static/view3d.js"></script>
 <script src="/static/shell.js"></script>
+<script src="/static/mapnav.js"></script>
+<script src="/static/suitability.js"></script>
 </body>
 </html>
