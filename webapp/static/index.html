@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LP Toolkit</title>
+<title>LP Toolkit | Urban GeoPlan</title>
+<link rel="icon" type="image/png" href="/static/brand/favicon.png">
+<meta name="author" content="Urban GeoPlan">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <link rel="stylesheet" href="/static/app.css">
@@ -12,11 +14,12 @@
 </head>
 <body>
 <header class="appbar">
-  <div class="brand"><span class="logo">LP</span>LP Toolkit <span>local plan preparation</span></div>
+  <div class="brand"><img class="ugp-logo" src="/static/brand/logo.png" alt="Urban GeoPlan" onerror="this.onerror=null;this.src='/static/brand/ugp-mark.svg'">LP Toolkit <span>local plan preparation &middot; by <b class="ugp-by">Urban GeoPlan</b></span></div>
   <div class="proj">
     <select id="projSel" title="Project"><option value="">Choose a project</option></select>
     <button id="newProj" class="ghost">New project</button>
     <button id="guideBtn" class="ghost">Guide</button>
+    <button id="aboutBtn" class="ghost" title="About LP Toolkit and Urban GeoPlan">About</button>
     <button id="v3dBtn" class="ghost" title="3D view: terrain, land use and buildings by height">3D view</button>
     <button id="stdBtn" class="ghost" title="LUSPA zoning guidelines and planning standards (2025)">Standards</button>
     <button id="themeBtn" class="ghost icon" title="Dark / light mode"></button>
@@ -224,5 +227,6 @@
 <script src="/static/shell.js"></script>
 <script src="/static/mapnav.js"></script>
 <script src="/static/suitability.js"></script>
+<script src="/static/about.js"></script>
 </body>
 </html>

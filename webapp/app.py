@@ -213,6 +213,18 @@ def design_roads(pid):
     if os.path.exists(lf): os.remove(lf)
     cmd += ['--roads', 'draft', '--pattern', j.get('pattern', 'mixed'), '--only', 'roads' if terrain_done(pid) else 'site,roads'] + site_inputs(pid, j) + design_args(j) + plot_args(pid)
     launch(pid, cmd, pending='draft'); return jsonify(ok=True)
+@app.post('/api/projects/<pid>/fit_roads')
+def fit_roads(pid):
+    """roads fitted slightly to the located facilities (user 2026-11-23): trim / shift / edge roads / reconnect around each site,
+    then only the touched blocks are re-plotted; the planner's own roads and the existing roads never move"""
+    if is_running(pid): return jsonify(error='a run is in progress'), 400
+    import fitroads
+    try: r = fitroads.fit(pdir(pid), os.path.join(outdir(pid), '_work') + '/', toolkit())
+    except Exception as ex:
+        import traceback; traceback.print_exc(); return jsonify(error=f'fitting the roads failed ({type(ex).__name__}: {ex})'), 500
+    if not r.get('ok'): return jsonify(error=r.get('msg', 'nothing to fit')), 400
+    m = meta(pid); m['plan_roads_hash'] = roads_hash(pid); m['last_edit'] = time.time(); save_meta(pid, m)
+    return jsonify(r)
 @app.post('/api/projects/<pid>/redesign')
 def redesign(pid):
     """redesign only inside the drawn areas: roads outside them (clipped at the area edge) and the planner's own roads are kept"""
@@ -358,8 +370,10 @@ def plots_undo(pid):
 EDITABLE = {
     'existing': [('Plots / land use', '{O}/{P}Plots_existing.shp'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp'), ('Blocks', '{O}/{P}Blocks_existing.shp'),
                  ('Road surface', '{O}/{P}Road_surface.shp'), ('Road centrelines', '{O}/{P}Roads_existing.shp'), ('Walls / fences', '{O}/{P}Walls_final.shp'),
-                 ('Vacant / open land', '{O}/{P}Vacant_open_land.shp'), ('Tree belt', '{O}/{P}Tree_belt_existing.shp'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson')],
-    'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'),
+                 ('Vacant / open land', '{O}/{P}Vacant_open_land.shp'), ('Tree belt', '{O}/{P}Tree_belt_existing.shp'), ('Pinch points', '{O}/{P}Road_pinch_points.shp'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson')],
+    'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'), ('Plots (before land use)', '{O}/_work/plots_final.gpkg'),
+               ('Road reserves', '{O}/_work/layout_roads.gpkg'), ('Road centrelines (design)', '{O}/_work/layout_centrelines.gpkg'),
+               ('Slope classes', '{O}/{P}Slope_classes.shp'), ('Contours', '{O}/{P}Contours.shp'), ('Steep-slope reserve', '{O}/{P}Steep_slope_reserve.shp'),
                ('Blocks', '{O}/_work/layout_blocks.gpkg'), ('Existing buildings', '{O}/_work/buildings.gpkg'), ('Existing roads to keep', 'existing.geojson'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson'), ('Redesign / zone areas', 'zones.geojson')],
 }
 READONLY = {'area_m2', 'frontage_m', 'depth_m', 'coverage', 'n_bld', 'main_bld', 'length_m', 'area_ac', '_fid'}

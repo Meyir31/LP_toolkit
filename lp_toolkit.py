@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""LP Toolkit: one script for local plan preparation (existing-situation mapping of built-up areas and new layouts).
+"""LP Toolkit (developed by Urban GeoPlan): one script for local plan preparation (existing-situation mapping of built-up areas and new layouts).
 
 Usage (from the LP_Toolkit folder, with its own Python: run.bat ... or env\\Scripts\\python.exe lp_toolkit.py ...):
 
@@ -20,6 +20,7 @@ The full guide (processes, rules, standards, data sources, lessons) is in GUIDE 
 """
 import os, sys, re, json, math, glob, time, pickle, shutil, argparse, warnings
 import numpy as np
+CREDIT = 'Prepared with LP Toolkit · Urban GeoPlan'
 warnings.filterwarnings('ignore')
 TOOLKIT = os.path.dirname(os.path.abspath(__file__))
 SAM_CKPT_DEFAULT = os.path.join(TOOLKIT, 'models', 'sam_vit_b_01ec64.pth').replace('\\', '/')
@@ -176,10 +177,100 @@ def facility_programme(ctx, pop):
         for k in prog:                                                     # items the planner did not list are off in a custom programme
             if k not in (J.get('items') or {}): prog[k]['n'] = 0
     return prog, J
-def facility_site_shapes(ctx, blocks=None):
+def grid_axis(S, existing):
+    """the direction the road grid runs (user 2026-11-23: facility sites line up with the roads): along the highest-order road in the site
+    (the blocks run parallel to it), else along the site's long side. existing: [(LineString, width_ft[, kind])]. Returns a unit vector."""
+    import shapely, numpy as np
+    from shapely.ops import unary_union
+    from shapely.geometry import LineString
+    its = [(it[0], float(it[1] if len(it) > 1 else 30)) for it in (existing or []) if it[0] is not None and it[0].intersection(S.buffer(100)).length > 150]
+    if its:
+        wt = max(w for _, w in its); g = unary_union([l.intersection(S.buffer(100)) for l, w in its if w == wt])
+        parts = [q for q in shapely.get_parts(shapely.line_merge(g) if g.geom_type == 'MultiLineString' else g) if q.geom_type == 'LineString']
+        if parts:
+            c = [np.array(q.simplify(10).coords)[:, :2] for q in parts]; v = np.vstack([np.diff(x, axis=0) for x in c if len(x) > 1])
+            L = np.linalg.norm(v, axis=1); a2 = np.arctan2(v[:, 1], v[:, 0]) * 2
+            if L.sum() > 0: a = math.atan2((np.sin(a2) * L).sum(), (np.cos(a2) * L).sum()) / 2; return np.array([math.cos(a), math.sin(a)])
+    q = np.array(S.minimum_rotated_rectangle.exterior.coords)[:, :2]; e1, e2 = q[1] - q[0], q[2] - q[1]
+    e = e1 if np.linalg.norm(e1) >= np.linalg.norm(e2) else e2; return e / np.linalg.norm(e)
+def align_site(poly, u):
+    """a rectangular site (square from a point, a suggestion, a drawn rectangle) turned about its centre so its sides run with the road grid
+    (u), same area and proportions; irregular outlines are kept exactly"""
+    import shapely, numpy as np
+    if poly is None or poly.is_empty or poly.geom_type != 'Polygon' or u is None: return poly
+    r = poly.minimum_rotated_rectangle
+    if r.area <= 0 or poly.area / r.area < 0.85: return poly
+    q = np.array(r.exterior.coords)[:, :2]; e1, e2 = q[1] - q[0], q[2] - q[1]; l1, l2 = np.linalg.norm(e1), np.linalg.norm(e2)
+    long_ = e1 if l1 >= l2 else e2; L, W = max(l1, l2), min(l1, l2)
+    cur = abs(float(long_ / max(L, 1e-9) @ u)); off = math.degrees(math.acos(min(1.0, cur)))
+    if min(off, 90 - off) < 2: return poly                              # already with the grid
+    k = math.sqrt(poly.area / (L * W)); L, W = L * k, W * k               # same area as the outline
+    ua = u if cur >= math.sqrt(0.5) else np.array([-u[1], u[0]])        # long side with the nearer grid direction
+    nn = np.array([-ua[1], ua[0]]); c = np.array(poly.centroid.coords[0])
+    return shapely.Polygon([tuple(c - ua * L / 2 - nn * W / 2), tuple(c + ua * L / 2 - nn * W / 2), tuple(c + ua * L / 2 + nn * W / 2), tuple(c - ua * L / 2 + nn * W / 2)])
+CORNER_FAC = {'corner_shop', 'sa'}     # user 2026-11-23: corner shops and S.A go on corner plots (one plot deep, at a junction)
+def fit_site_to_blocks(g, A, blocks, keep_roads=None, corner=False):
+    """user 2026-11-23: a located facility FITS INTO THE DESIGNED ROADS. g: where the planner put it (point or outline), A: area (sq ft),
+    blocks: the blocks between the roads. Returns (site, [blocks used]):
+    - the block under it if that block is about the right size;
+    - a part of that block, across its full depth (frontage on both roads), when the block is much bigger;
+    - neighbouring blocks across a local road joined into one site when one block is too small (the local road between them is dropped;
+      never across a collector, main, existing or planner's road: keep_roads)."""
+    import shapely, numpy as np
+    from shapely.ops import unary_union
+    from shapely.geometry import Point
+    if not blocks: return None, []
+    p = g if g.geom_type == 'Point' else g.representative_point()
+    zone = g if g.geom_type in ('Polygon', 'MultiPolygon') else p.buffer(math.sqrt(A) / 2)
+    ov = [(b.intersection(zone).area, -b.distance(p), k) for k, b in enumerate(blocks)]
+    b0 = blocks[max(ov)[2]] if max(ov)[0] > 0 else min(blocks, key=lambda b: b.distance(p))
+    if b0.area >= 0.75 * A:
+        if b0.area <= 1.3 * A: return b0, [b0]
+        c = np.array(b0.minimum_rotated_rectangle.exterior.coords); e1, e2 = c[1] - c[0], c[2] - c[1]
+        if corner:                                                       # the corner of the block nearest where it was put: one row deep, along the end road
+            ax = e1 if np.linalg.norm(e1) >= np.linalg.norm(e2) else e2; L = np.linalg.norm(ax); u = ax / L; nn = np.array([-u[1], u[0]])
+            W = min(np.linalg.norm(e1), np.linalg.norm(e2)); d = W / 2 if W > 150 else W; length = min(L, A / max(d, 1))
+            cc = np.array(b0.minimum_rotated_rectangle.centroid.coords[0]); q = np.array(zone.centroid.coords[0])
+            su = 1.0 if (q - cc) @ u >= 0 else -1.0; sn = 1.0 if (q - cc) @ nn >= 0 else -1.0
+            m = cc + u * su * (L / 2 - length / 2) + nn * sn * (W / 2 - d / 2); hl, hd = length / 2, d / 2
+            rect = shapely.Polygon([tuple(m + u * su * (hl + 30) + nn * sn * (hd + 30)), tuple(m - u * su * hl + nn * sn * (hd + 30)), tuple(m - u * su * hl - nn * sn * hd), tuple(m + u * su * (hl + 30) - nn * sn * hd)])
+            poly = b0.intersection(rect)
+            if not poly.is_empty:
+                if poly.geom_type != 'Polygon': poly = max(shapely.get_parts(poly), key=lambda x: x.area)
+                rest = [x for x in shapely.get_parts(b0.difference(poly.buffer(0.5))) if x.area > 0]
+                small = [x for x in rest if x.area < 7000]
+                if small:
+                    poly = unary_union([poly] + small).buffer(0.5, join_style=2).buffer(-0.5, join_style=2)
+                    if poly.geom_type != 'Polygon': poly = max(shapely.get_parts(poly), key=lambda x: x.area)
+                return poly, [b0]
+        ax = e1 if np.linalg.norm(e1) >= np.linalg.norm(e2) else e2; L = np.linalg.norm(ax); u = ax / L; nn = np.array([-u[1], u[0]])
+        W = min(np.linalg.norm(e1), np.linalg.norm(e2)); length = min(L, A / max(W, 1))
+        q = np.array(zone.centroid.coords[0]); cc = np.array(b0.minimum_rotated_rectangle.centroid.coords[0]); t = float((q - cc) @ u)
+        t = max(-L / 2 + length / 2, min(L / 2 - length / 2, t)); m = cc + u * t
+        rect = shapely.Polygon([tuple(m - u * length / 2 - nn * W), tuple(m + u * length / 2 - nn * W), tuple(m + u * length / 2 + nn * W), tuple(m - u * length / 2 + nn * W)])
+        poly = b0.intersection(rect)
+        if poly.geom_type != 'Polygon': poly = max(shapely.get_parts(poly), key=lambda x: x.area)
+        rest = [x for x in shapely.get_parts(b0.difference(poly.buffer(0.5))) if x.area > 0]
+        small = [x for x in rest if x.area < 7000]                                       # a leftover too small for a plot joins the site (no sliver)
+        if small:
+            poly = unary_union([poly] + small).buffer(0.5, join_style=2).buffer(-0.5, join_style=2)
+            if poly.geom_type != 'Polygon': poly = max(shapely.get_parts(poly), key=lambda x: x.area)
+        return poly, [b0]
+    grp = [b0]; U = b0
+    close = lambda G_: unary_union(G_).buffer(20, join_style=2).buffer(-20, join_style=2)
+    while sum(b.area for b in grp) < 0.85 * A:
+        nb = [b for b in blocks if not any(b is x for x in grp) and b.distance(U) < 35]
+        nb = [b for b in nb if keep_roads is None or not close(grp + [b]).buffer(-3).intersects(keep_roads)]
+        if not nb: break
+        tot_ = sum(x.area for x in grp)                                                 # where the planner put it, without overshooting the size much
+        b = max(nb, key=lambda b: (b.intersection(zone).area - 0.7 * max(0.0, tot_ + b.area - 1.15 * A), -b.distance(p))); grp.append(b); U = close(grp)
+    if U.geom_type != 'Polygon': U = max(shapely.get_parts(U), key=lambda x: x.area)
+    return U, grp
+def facility_site_shapes(ctx, blocks=None, axis=None):
     """the planner's located facilities (facility_sites.geojson): outlines as drawn; points -> a compact site of the requested size
     across the full depth of the block that holds the point (whole block if it is small), or a square when there are no blocks yet"""
-    import geopandas as gpd, shapely, numpy as np
+    import geopandas as gpd, shapely, shapely.affinity, numpy as np
+    from shapely.ops import unary_union
     f = ctx.get('facility_sites')
     if not f or not os.path.exists(f): return []
     G = gpd.read_file(f)
@@ -193,24 +284,19 @@ def facility_site_shapes(ctx, blocks=None):
         if fid not in FAC_BY_ID: continue
         size = float(r.get('size_ac') or prog_sz.get(fid) or FAC_BY_ID[fid]['size']); g = r.geometry
         if g is None or g.is_empty: continue
-        if g.geom_type in ('Polygon', 'MultiPolygon'): poly = g.buffer(0)
+        A = size * 43560; poly = None
+        if g.geom_type in ('Polygon', 'MultiPolygon'):
+            poly = g.buffer(0)
+            if blocks is not None and blocks and poly.difference(unary_union(blocks)).area > 0.15 * poly.area: poly = fit_site_to_blocks(poly, A, blocks, corner=fid in CORNER_FAC)[0] or poly   # crosses a road: into the blocks
+            elif axis is not None: poly = align_site(poly, axis)
         else:
-            p = g if g.geom_type == 'Point' else g.centroid; A = size * 43560; poly = None
-            if blocks is not None:
+            p = g if g.geom_type == 'Point' else g.centroid
+            if blocks is not None and blocks:
                 hit = [b for b in blocks if b.buffer(5).contains(p)]
-                if hit:
-                    b = hit[0]
-                    if b.area <= 1.3 * A: poly = b
-                    else:
-                        c = np.array(b.minimum_rotated_rectangle.exterior.coords); e1, e2 = c[1] - c[0], c[2] - c[1]
-                        ax = e1 if np.linalg.norm(e1) >= np.linalg.norm(e2) else e2; L = np.linalg.norm(ax); u = ax / L; nn = np.array([-u[1], u[0]])
-                        W = min(np.linalg.norm(e1), np.linalg.norm(e2)); length = min(L, A / max(W, 1))
-                        q = np.array(p.coords[0]); cc = np.array(b.minimum_rotated_rectangle.centroid.coords[0]); t = float((q - cc) @ u)
-                        t = max(-L / 2 + length / 2, min(L / 2 - length / 2, t)); m = cc + u * t
-                        rect = shapely.Polygon([tuple(m - u * length / 2 - nn * W), tuple(m + u * length / 2 - nn * W), tuple(m + u * length / 2 + nn * W), tuple(m - u * length / 2 + nn * W)])
-                        poly = b.intersection(rect)
-                        if poly.geom_type != 'Polygon': poly = max(shapely.get_parts(poly), key=lambda x: x.area)
-            if poly is None: side = A ** 0.5; poly = shapely.box(p.x - side / 2, p.y - side / 2, p.x + side / 2, p.y + side / 2)
+                if hit: poly = fit_site_to_blocks(p, A, blocks, corner=fid in CORNER_FAC)[0]
+            if poly is None:
+                side = A ** 0.5; poly = shapely.box(p.x - side / 2, p.y - side / 2, p.x + side / 2, p.y + side / 2)
+                if axis is not None: poly = align_site(shapely.affinity.rotate(poly, 10, origin=p), axis)     # square turned to the road grid
         out.append(dict(fid=fid, name=FAC_BY_ID[fid]['name'], use=FAC_BY_ID[fid]['use'], size=size, geometry=poly))
     return out
 # ---------------------------------------------------------------------------------------------------------------------
@@ -453,7 +539,15 @@ def suitability(proj_dir, out_dir, fid, size_ac=None, n=5, cell=25.0, rejected=N
         side = math.sqrt(A); k = max(1, int(round(side / cell)))
         sc0 = np.nan_to_num(sc, nan=0.0); valid = ndimage.uniform_filter(np.isfinite(sc).astype(float), k, mode='constant')
         mean = ndimage.uniform_filter(sc0, k, mode='constant') / np.maximum(valid, 1e-6); mean[valid < 0.9] = -1
-        q = np.array(S.minimum_rotated_rectangle.exterior.coords); e1 = q[1] - q[0]; ang = math.degrees(math.atan2(e1[1], e1[0]))
+        ex_ = []                                                       # squares with the road grid (along the highest road), as the design will run
+        for src in (os.path.join(proj_dir, 'existing.geojson'), W + 'osm_roads.gpkg'):
+            G = rd(src)
+            if G is None or G.empty: continue
+            for _, r in G.iterrows():
+                if r.geometry is None or r.geometry.geom_type not in ('LineString', 'MultiLineString'): continue
+                w_ = float(r.get('width_ft') or 0) or {'primary': 60, 'trunk': 80, 'secondary': 60, 'tertiary': 40}.get(str(r.get('highway')), 30)
+                ex_ += [(q_, w_) for q_ in shapely.get_parts(r.geometry)]
+        u_ = grid_axis(S, ex_); ang = math.degrees(math.atan2(u_[1], u_[0]))
         taken = None
         for _ in range(n * 4):
             if len(cands) >= n: break
@@ -887,6 +981,8 @@ def obm_load(site, buffer_deg=0.0005, crs=2136):
 
 GUIDE = r"""# LP Toolkit: local plan preparation guide
 
+LP Toolkit is developed and maintained by **Urban GeoPlan**, a geospatial and urban planning initiative in Ghana focused on spatial analytics, urban planning and digital mapping solutions.
+
 Everything learned while preparing the test local plans (test.kml, Tests 2 to 5, Obusomase, Phase One, STMA scheme study) in one place.
 This guide is printed by `python lp_toolkit.py guide` and is also written next to the script as `LP_Toolkit_Guide.md`.
 
@@ -924,7 +1020,24 @@ Two workflows, each a chain of stages that read and write files in one output fo
 | landuse | Facility programme (LUSPA + STMA rates and site shapes, section 7) |
 | audit | Design audit: every flaw with location and suggested fix (section 8). Run after every design |
 
-**Web app.** `run_webapp.bat` opens the same workflows in the browser (http://localhost:5050; `run_webapp.bat --lan` lets other computers on the office network open it). Projects are kept in `D:/Work/2026/Machine Learning/LP_Projects/`. Draw or upload the site, roads (with widths), existing roads and streams on the satellite map; choose the road option; run with a live log; view the results as map layers (plots by use, audit findings) and download everything as a zip.
+**Web app.** `run_webapp.bat` opens the same workflows in the browser (http://localhost:5050; `run_webapp.bat --lan` lets other computers on the office network open it). Projects are kept in `D:/Work/2026/Machine Learning/LP_Projects/`. Draw or upload the site, roads (with widths), existing roads and streams on the satellite map; choose the road option; run with a live log; view the results as map layers (plots by use, audit findings) and download everything as a zip. The header buttons open this Guide, the About box (what the toolkit does, Urban GeoPlan), the 3D view and the LUSPA standards.
+
+Web app tools (ribbon tabs Project, Map, Edit, Design, Analysis, View):
+
+| Tool | What it does |
+|---|---|
+| Contents | Every layer grouped (Land use and plots, Roads, Buildings, Terrain and environment, Checks) with a tick box to show / hide it, including the roads you drew; drag to change the drawing order. Right-click a layer (or its zoom button) for Zoom to layer; Zoom to selection on the Map tab |
+| Navigation | Mouse wheel zooms in half steps; hold **Shift** and scroll to zoom in fine steps |
+| Labels | Map tab: labels on / off and the attribute to show (use, name, area ...), with overlap avoidance |
+| Angles | Map tab: show / hide the junction angle marks on the roads |
+| Select | Works on every layer: a click picks the line or point under it first, then the smallest area (plot, facility, block, road reserve), terrain layers last. Hidden layers are never picked: untick a layer to reach what is under it. Shift + click adds to the selection |
+| Delete | Deletes the selection on any editable layer (ribbon Delete or the Delete key); one undo step per edit |
+| Change use | Gives selected plots a new use; your changes are kept when the plan is updated (use_overrides.geojson) |
+| Coordinate system | Project tab: any coordinate system that covers Ghana (Ghana National Grid ft, Ghana Metre Grid, UTM 30N / 31N, WGS 84 ...). Changes the coordinates shown and the exported files; the work itself stays in EPSG:2136 |
+| Facilities and services | The facility checklist (section 7) |
+| Suitability | Where a facility could go (section 7): heat map and the best sites; Accept, Reject or Relocate each one |
+| Fit roads | After accepting a suitability site on a designed plan: the roads are adjusted slightly around it (section 7) |
+| 3D view | Terrain, land use (open spaces included) and buildings by height |
 
 **Site analysis comes first.** The `site` stage prepares the terrain before any road is drawn: Copernicus 30 m DEM, contours at an interval adapted to the relief (1, 2, 5, 10 m...), slope in percent, slope classes (flat 0-5%, gentle 5-10%, moderate 10-18%, steep 18-30%: no roads straight downhill, very steep > 30%: keep green) and the steep-slope reserve (slopes >= `--steep` %, default 30, pieces >= 0.5 ac kept green and excluded from blocks). Outputs: `<P>Contours.shp`, `<P>Slope_classes.shp`, `<P>Slope_percent.tif`, `<P>Steep_slope_reserve.shp`, `<P>Terrain_summary.json`, `<P>Site_analysis.png`, map overlays. In the web app: "Prepare site analysis", then review the terrain layers before planning roads.
 
@@ -1055,15 +1168,29 @@ Programme: LUSPA Manual 4.6.3 + the 2025 Guidelines mandatory list. Rates, site 
 | Day care | 0.6-0.7 ac square across both rows | neighbourhood cluster by the market; 60 m from a fuel station |
 | Clinic | about 1 ac (200 x 240 ft) across both rows | near the school, as far as the site allows (LUSPA 500 m) from market, lorry park, S.A, fuel; second clinic only above 5,000 people |
 | Market | about 1 ac per section; main market with lorry park 5 ac for 20,000 | gateway corner; lorry park on the main road side |
-| Corner shop | at least 0.25 ac (two plots where one is smaller) | collector corners |
+| Corner shop | at least 0.25 ac (two plots where one is smaller) | corner plots at junctions (collector corners when the toolkit places them) |
 | Fuel station | 0.5-1 ac junction corner | main road only; 60 m from schools / day care, 500 m from clinics, 30 m from streams, 300 m from the next station |
 | Place of worship | 0.5-0.8 ac (aim 0.75) corner parcel across both rows | 1 per ~1,500 people; away from fuel and S.A |
-| P.O.S | 1-1.5 ac within about 500 m of every home; total about 1.2 ac per 1,000 people | wedges, corners, low ground; every open space with road frontage |
+| P.O.S | 1-1.5 ac within about 400 m of every home; total about 1.2 ac per 1,000 people | spread over the plan (farthest homes first); wedges, corners, low ground; every open space with road frontage; never landscaped green or residential plots notched into it |
 | Children's playground | 0.5-1 ac | in the neighbourhood cluster, within about 400 m of every home |
-| S.A | 0.2-0.45 ac on a road a refuse truck can use | every home within 500 m; 60 m from schools, day care, playgrounds, clinics; off the main road |
+| S.A | 0.2-0.45 ac on a corner plot, on a road a refuse truck can use | every home within 500 m; 60 m from schools, day care, playgrounds, clinics; off the main road |
 | Police / fire | police 2.5-3 ac (LUSPA) | on the main road at the edge of the housing |
 
-**Facility programme (web app "Facilities and services", after the site analysis).** Either the toolkit decides (the counts the population needs: `python lp_toolkit.py facilities --pop N` prints the catalogue of about 60 services, all levels, from LUSPA 2025 and the study) or the planner ticks each facility with its number, site size and, optionally, its location (a point: a site of that size is shaped across the full depth of the block that holds it; or the exact outline). Saved as facilities.json (mode auto | custom, items {id: on, n, size_ac}, decisions) and facility_sites.geojson (fac_id); passed with `--facilities` / `--facility-sites`. Located sites are kept clear by the road designer and taken out of the blocks before subdivision. Learned facilities (school, playground, market, fuel, clinic, worship, day care, P.O.S, S.A, U.T, shops, police post, lorry park) keep their own placement rules with the planner's numbers and sizes; the others (SHS, hospitals, police station, cemetery, hotels, utilities ...) go to a leftover site of the right size by their siting preference. When a requested facility does not fit, the land-use stage writes shortfall.json and the run pauses: for each item the planner chooses Take the plots / Skip / Reduce the size, and the run continues from land use. In the toolkit's own programme it takes the plots by itself.
+**Facility programme (web app "Facilities and services", after the site analysis).** Either the toolkit decides (the counts the population needs: `python lp_toolkit.py facilities --pop N` prints the catalogue of about 60 services, all levels, from LUSPA 2025 and the study) or the planner ticks each facility with its number, site size and, optionally, its location (a point or an outline). Saved as facilities.json (mode auto | custom, items {id: on, n, size_ac}, decisions) and facility_sites.geojson (fac_id); passed with `--facilities` / `--facility-sites`. Located sites are taken out of the blocks before subdivision. Learned facilities (school, playground, market, fuel, clinic, worship, day care, P.O.S, S.A, U.T, shops, police post, lorry park) keep their own placement rules with the planner's numbers and sizes; the others (SHS, hospitals, police station, cemetery, hotels, utilities ...) go to a leftover site of the right size by their siting preference. When a requested facility does not fit, the land-use stage writes shortfall.json and the run pauses: for each item the planner chooses Take the plots / Skip / Reduce the size, and the run continues from land use. In the toolkit's own programme it takes the plots by itself.
+
+**Located facilities fit into the designed roads (user, 2026-11-23).** The road designer lays the grid as usual (no ring roads around the sites, no site at an angle to the grid); then each located facility takes the block where the planner put it:
+- the whole block when it is about the right size;
+- a stretch of the block across its full depth (frontage on both roads) when the block is much bigger; a leftover too small for a plot joins the site;
+- neighbouring blocks joined into one site when one block is too small (the local road between them is dropped; never across a collector, main, existing or planner's road).
+Sizes therefore follow the blocks (two whole blocks for a 3 ac school, for example); the run log notes any site smaller than asked. The fitted outlines are saved back to facility_sites.geojson (backup `.before_fit`), so the map, the land use and Fit roads use the same outline. A planner's outline that crosses a road is fitted the same way at the land-use stage.
+
+**Corner shops and S.A on corner plots (user, 2026-11-23).** A located corner shop or S.A takes the corner of the block nearest where it was put: one plot row deep, fronting both roads at the junction. S.A sites the toolkit places itself start from a corner plot. Neither grows by taking in the plots or leftover pieces beside it.
+
+**Facilities spread out (neighbourhood distribution, user 2026-11-23).** The homes are grouped into neighbourhood units of about 5,000 people; core facilities (basic school, clinic, market, day care, community centre) go one per unit, to the unit furthest from the ones already placed. Walking-catchment uses go farthest-first: P.O.S until every home is within 400 m (each at least 100 ft wide, length up to 3 x width), S.A within 500 m, worship within 500 m. The same kind is kept apart (playgrounds and day cares about 240 m, clinics 720 m, markets and community centres 600 m, second schools 480 m).
+
+**Suitability (web app, Design > Suitability).** For any facility in the catalogue: a heat map of every 25 ft cell scored from the site analysis (slope, high / low ground, streams, steep reserve) and the standards (distance rules, catchments, road access where the facility needs an existing main road; elsewhere the road design provides access), and the best sites of the required size, spread over the whole planning area so that each serves the most homes. Type how many suggestions you want. Before the roads the sites are squares running with the road grid; on a designed plan they are compact plot groups. For each: **Accept** (it becomes a located facility; Apply to the plan now), **Reject** (never suggested again), or **Relocate** (drag it, or click Relocate then the new place: it snaps to the plots there and is scored again).
+
+**Fit roads (after accepting a suitability site on a designed plan).** Slight changes only: designed roads through the site are trimmed to its edge, a short road just beside it is shifted onto its edge, sides without frontage get an edge road, cut road ends are reconnected; your own roads and the existing roads never move (reported instead). Only the blocks touched are re-plotted.
 
 ## 8. Checks to run before presenting anything (self-audit)
 
@@ -1075,7 +1202,7 @@ Layout (`design` audit):
 Existing situation:
 - Footprints: compare counts and roof-area IoU with the building database; look at a crop in the dense core and a crop in a planned area before accepting.
 - Plots: buildings cut by plot lines, plots deeper than 60 m, open / yard plots, interior plots, overlap = 0, coverage about 100%. Look at curved blocks and block ends on the image before presenting.
-- Maps: legend outside the map frame (never covering the site); building outlines in a colour distinct from plot lines; no empty legend entries; title with the place name.
+- Maps: legend outside the map frame (never covering the site); building outlines in a colour distinct from plot lines; no empty legend entries; title with the place name. Map sheets carry the credit "Prepared with LP Toolkit · Urban GeoPlan".
 
 Reporting rules: say what failed and what is uncertain; give numbers; no proposals unless asked; no em dashes in documents (use colons, commas or parentheses).
 
@@ -2150,10 +2277,42 @@ def st_design_autoroads(ctx):
     res = {}
     for pt in pats:
         print(f'   -- pattern: {PATTERNS[pt]}', flush=True)
-        FACP = [x['geometry'] for x in facility_site_shapes(ctx)]                      # the planner's located facilities: roads go around them
-        if FACP and pt == pats[0]: print(f'   located facility sites kept clear of roads: {len(FACP)}')
-        obst = (stream.union(unary_union(FACP)) if stream is not None else unary_union(FACP)) if FACP else stream
-        L = auto_roads(S, existing, obst, bld, log=print, terrain=terrain, pattern=pt, zones=zones, only_zones=bool(ctx.get('only_zones')))
+        # user 2026-11-23: the located facilities FIT INTO THE DESIGNED ROADS (no ring roads drawn around them): the grid is designed as usual,
+        # then each site takes the block / part of a block / joined blocks where the planner put it, and the outline is saved
+        FX_ = facility_site_shapes(ctx)
+        L = auto_roads(S, list(existing), stream, bld, log=print, terrain=terrain, pattern=pt, zones=zones, only_zones=bool(ctx.get('only_zones')))
+        if FX_:
+            KEEP_ = unary_union([l_ for l_, w_, k_ in L if k_ in ('existing', 'locked') or w_ > AUTO['local'] + 1]); fitted = []
+            surf0 = road_surface([l for l, *_ in L], [w / 2 for _, w, _ in L], tol=3.0, clip=S)
+            BL_ = [b for b in shapely.get_parts(S.difference(surf0.union(stream.intersection(S)) if stream is not None else surf0)) if b.area > 2000]
+            for x in FX_:
+                g0 = x['geometry']
+                site_, used_ = fit_site_to_blocks(g0, x['size'] * 43560, BL_, KEEP_, corner=x['fid'] in CORNER_FAC)
+                if site_ is None: fitted.append(g0); continue
+                fitted.append(site_)
+                if len(used_) > 1:                                            # joined blocks: the local road between them is dropped
+                    L2 = []
+                    for l_, w_, k_ in L:
+                        if k_ in ('existing', 'locked') or w_ > AUTO['local'] + 1: L2.append((l_, w_, k_)); continue
+                        for q_ in shapely.get_parts(l_.difference(site_.buffer(-2))):
+                            if q_.geom_type == 'LineString' and q_.length > 40: L2.append((q_, w_, k_))
+                    L = L2
+                rest_ = []                                                    # the rest of a block it took part of stays for plots; the next site cannot take this one
+                for b in BL_:
+                    if any(b is u_ for u_ in used_):
+                        rest_ += [q_ for q_ in shapely.get_parts(b.difference(site_.buffer(0.5))) if q_.geom_type == 'Polygon' and q_.area > 2000]
+                    else: rest_.append(b)
+                BL_ = rest_
+            if pt == pats[0]:
+                print(f'   located facility sites fitted into the road blocks: {len(fitted)} (whole block, part of a block across its depth, or neighbouring blocks joined)', flush=True)
+                try:
+                    G_ = gpd.read_file(ctx['facility_sites']); crs_ = G_.crs; G2_ = G_.to_crs(2136); k_ = 0
+                    for i_, r_ in G2_.iterrows():
+                        if str(r_.get('fac_id') or r_.get('fid') or '') not in FAC_BY_ID or r_.geometry is None or r_.geometry.is_empty: continue
+                        if k_ < len(fitted): G2_.at[i_, 'geometry'] = fitted[k_]; k_ += 1
+                    G2_['fitted'] = 'roads'
+                    shutil.copy(ctx['facility_sites'], ctx['facility_sites'] + '.before_fit'); G2_.to_crs(crs_).to_file(ctx['facility_sites'], driver='GeoJSON')
+                except Exception as e_: print(f'   (could not save the fitted sites: {e_})')
         new = [l for l, w, k in L if k not in ('existing', 'locked')]
         surf = road_surface([l for l, *_ in L], [w / 2 for _, w, _ in L], tol=3.0, clip=S)
         blocked = surf.union(stream.intersection(S)) if stream is not None else surf
@@ -3379,6 +3538,7 @@ def st_map(ctx):
                Patch(fc='white', ec='#555', hatch='///', label=f'Interior plot: access lane not mapped, verify ({len(INT)})'),
                Patch(fc='none', ec='black', label='Block (number)'), Patch(fc='none', ec='#1f5fd1', lw=1.5, label='Building footprint'), Patch(fc='none', ec='#222', label='Plot boundary')], loc='upper left', bbox_to_anchor=(1.01, 1), fontsize=11, framealpha=.95, borderaxespad=0)
     ax.set_title(TITLE + f' - existing land use (LUSPA colour codes): {len(BL)} blocks, {len(PL)} plots', fontsize=16)
+    plt.gcf().text(0.99, 0.004, CREDIT, ha='right', va='bottom', fontsize=7, color='#555')
     try: plt.savefig(D + PFX + 'Existing_land_use_map.png', bbox_inches='tight', dpi=70)
     except OSError: plt.savefig(D + PFX + 'Existing_land_use_map.png'.replace('.png', '_v2.png'), bbox_inches='tight', dpi=70); print('map file open elsewhere - saved as _v2')
     P2 = gpd.read_file(D + PFX + 'Plots_existing.shp'); site2 = gpd.read_file(SITE_KML).to_crs(2136).geometry.iloc[0]
@@ -4179,6 +4339,11 @@ def st_design_landuse(ctx):
         if best: return best[1]
         return chain(list(cands)[0], n) if len(list(cands)) else []
     def plots_along_frontage(poly, depth=105.0, fw=70.0):
+        if poly.geom_type != 'Polygon':                                     # a piece in several parts (e.g. beside a located facility): each part on its own
+            outs, rests = [], []
+            for q_ in shapely.get_parts(poly):
+                if q_.geom_type == 'Polygon' and q_.area > 1: o_, r_ = plots_along_frontage(q_, depth, fw); outs += o_; rests.append(r_)
+            return outs, unary_union(rests) if rests else poly
         edges = poly.exterior.intersection(ROADS.buffer(3)); edges = shapely.line_merge(unary_union([e for e in shapely.get_parts(edges) if e.geom_type == 'LineString']))
         out, used = [], Point(0, 0).buffer(0.01)
         for e in sorted([x for x in shapely.get_parts(edges) if x.length >= 140], key=lambda x: -x.length):
@@ -4194,7 +4359,36 @@ def st_design_landuse(ctx):
             used = used.union(strip)
         return out, poly.difference(unary_union(out)) if out else poly
     def far(g, other, d): return other is None or other.is_empty or g.distance(other) > d
+    # ---- spreading facilities (user 2026-11-23): walking catchments + neighbourhood units of about 5,000 people ----
+    CATCH_FT = {'pos': 1312, 'kids_playground': 1312, 'day_care': 1312, 'sa': 1640, 'worship': 1640, 'basic_school': 2625, 'clinic': 3937, 'nbh_market': 3281, 'sub_market': 3281, 'community_centre': 3281}
+    def homes_xy():
+        h_ = P[P.use.isin(['RE', 'RA']) & ~P.geometry.is_empty & P.geometry.notna()]
+        return np.array([[q.x, q.y] for q in h_.geometry.centroid]) if len(h_) else np.zeros((0, 2))
+    def gap_target(existing, catch_ft):
+        """where the next site of a kind should go: near the home furthest from the existing ones, pulled towards the homes around it"""
+        H = homes_xy()
+        if not len(H): return P.union_all().centroid, 0.0
+        EU = unary_union([e for e in existing if e is not None and not e.is_empty]) if existing else None
+        d = shapely.distance(EU, shapely.points(H)) if EU is not None and not EU.is_empty else np.full(len(H), 1e9)
+        k = int(np.argmax(d)); f_ = H[k]; near_ = H[np.hypot(H[:, 0] - f_[0], H[:, 1] - f_[1]) < catch_ft]
+        t = 0.5 * f_ + 0.5 * (near_.mean(0) if len(near_) else f_); return Point(float(t[0]), float(t[1])), float(d[k])
+    def sites_of(prefixes):
+        lab_ = pd.concat([P.label, R.label]).fillna('').astype(str); geo_ = list(P.geometry) + list(R.geometry)
+        return [g for l, g in zip(lab_, geo_) if any(l.startswith(x) for x in prefixes)]
+    def units_(k):
+        """neighbourhood units: the homes grouped into k parts (k-means, farthest-point start)"""
+        H = homes_xy()
+        if len(H) < k or k < 2: return [H.mean(0)] if len(H) else []
+        C_ = [H[0]]
+        for _ in range(k - 1): C_.append(H[np.argmax(np.min([np.hypot(H[:, 0] - c[0], H[:, 1] - c[1]) for c in C_], axis=0))])
+        C_ = np.array(C_)
+        for _ in range(20):
+            lab = np.argmin(np.stack([np.hypot(H[:, 0] - c[0], H[:, 1] - c[1]) for c in C_]), axis=0)
+            C_ = np.array([H[lab == j].mean(0) if (lab == j).any() else C_[j] for j in range(k)])
+        return list(C_)
     def has_front(g): return g.boundary.intersection(ROADS.buffer(2)).length >= 30          # every open space reachable from a road (the landlocked Prestea-Brumasi P.O.S lesson)
+    def pos_shape(g):
+        w_, l_ = mrr(g); return w_ >= 100 and l_ / max(w_, 1) <= 3                     # a usable open space: at least 100 ft wide, not a long strip
     def FUEL_DIST(idx):
         u = unary_union(list(P.loc[idx].geometry)); out = []
         for nm, g in (('school', SCH), ('market', MK)):
@@ -4207,18 +4401,41 @@ def st_design_landuse(ctx):
         if len(parts) != 1: return False
         w_, l_ = mrr(parts[0]); return parts[0].area / max(w_ * l_, 1) >= 0.8 and l_ / max(w_, 1) <= 2.5 and has_front(parts[0])
     ISLANDS = []
+    def add_plots(newp, blk_id):
+        nonlocal P
+        P = gpd.GeoDataFrame(pd.concat([P, gpd.GeoDataFrame(dict(use=['RE'] * len(newp), label=[''] * len(newp), block=[blk_id] * len(newp), main=[q.distance(MAIN) < 3 for q in newp], kor=[False] * len(newp), elev=[elev(q) for q in newp]), geometry=newp, crs=P.crs)], ignore_index=True), geometry='geometry', crs=P.crs)
+    SMALLC = lambda T_, j: str(T_.at[j, 'label'] if 'label' in T_ else '').startswith(('S.A', 'Corner Shop'))   # corner shops / S.A stay one corner plot (user 2026-11-23)
     def join_piece(i):
         """a leftover piece joins the facility / open space beside it (else the residential plot beside it); alone with frontage it is a P.O.S"""
         g = R.geometry[i]; g2 = g.buffer(1.5)
         rs = [j for j in R.index if j != i and R.at[j, 'use'] not in ('', 'DROP') and R.geometry[j].intersection(g2).area > 10]
         ps = [j for j in P.index if P.geometry[j].intersection(g2).area > 10]
-        fac = [('R', j, R.geometry[j].intersection(g2).area) for j in rs] + [('P', j, P.geometry[j].intersection(g2).area) for j in ps if P.at[j, 'use'] not in ('RE', 'RA')]
+        fac = [('R', j, R.geometry[j].intersection(g2).area) for j in rs if not SMALLC(R, j)] + [('P', j, P.geometry[j].intersection(g2).area) for j in ps if P.at[j, 'use'] not in ('RE', 'RA') and not SMALLC(P, j)]
         res_ = [('P', j, P.geometry[j].intersection(g2).area) for j in ps if P.at[j, 'use'] in ('RE', 'RA')]
         for opts in (fac, res_):
             for t, j, _ in sorted(opts, key=lambda x: -x[2]):
                 tgt = R if t == 'R' else P; ug = unary_union([tgt.geometry[j], g]).buffer(0.5).buffer(-0.5)
                 if ug.geom_type == 'Polygon': tgt.at[j, 'geometry'] = ug; R.at[i, 'use'] = 'DROP'; return
-        if has_front(g) and g.area >= 0.4 * AC: R.at[i, 'use'] = 'POS'; R.at[i, 'label'] = 'P.O.S'
+        if has_front(g) and g.area >= 0.4 * AC:
+            w_g, l_g = mrr(g)
+            if l_g / max(w_g, 1) <= 3 and far(g, unary_union(list(R.geometry[R.use == 'POS']) + list(P.geometry[P.use == 'POS'])), 787):     # open space only where it adds a walking catchment (spread out), and a usable shape (not a long strip)
+                R.at[i, 'use'] = 'POS'; R.at[i, 'label'] = 'P.O.S'; return
+            newp, rest_ = plots_along_frontage(g)                            # close to another open space: plots along its road edges instead
+            if newp:
+                add_plots(newp, -5000 - i); left_ = []
+                for q in shapely.get_parts(rest_) if rest_ is not None and not rest_.is_empty else []:
+                    if q.area < 50: continue
+                    nb = P[(P.geometry.buffer(1).intersection(q).area > 5) & ~P.label.fillna('').astype(str).str.startswith(('S.A', 'Corner Shop'))]
+                    if len(nb):
+                        j = max(nb.index, key=lambda j: P.geometry[j].buffer(1).intersection(q).area); ug = unary_union([P.geometry[j], q]).buffer(0.5).buffer(-0.5)
+                        if ug.geom_type == 'Polygon': P.at[j, 'geometry'] = ug; continue
+                    left_.append(q)                                              # not joined: kept (never lost); a usable piece becomes a plot
+                for q in left_:
+                    if q.area >= MINPLOT and has_front(q): add_plots([q], -5000 - i)
+                    else: ISLANDS.append(q)
+                R.at[i, 'use'] = 'DROP'; return
+            if w_g < 80: ISLANDS.append(g); R.at[i, 'use'] = 'DROP'; return      # a strip too narrow for plots or a usable open space: part of the road reserve (verge)
+            R.at[i, 'use'] = 'POS'; R.at[i, 'label'] = 'P.O.S'
         else: ISLANDS.append(g); R.at[i, 'use'] = 'DROP'                 # a small island between roads: part of the road reserve, not a green or open space
     def chain_area(seed, target_ac, max_n=5):
         grp = chain(seed, 1)
@@ -4313,10 +4530,10 @@ def st_design_landuse(ctx):
     west_of_stream = lambda c: c.geometry.centroid.within(WZ.buffer(5))
     for side in ([lambda c: ~west_of_stream(c), west_of_stream] + [lambda c: ~west_of_stream(c)] * 20)[:n_pw]:
         c = compact(0.67 * PW_S, 1.2 * PW_S, side)
-        c = c[[R.geometry[i].area / np.prod(mrr(R.geometry[i])) >= 0.8 and far(R.geometry[i], FUEL, 197) for i in c.index]] if len(c) else c
+        c = c[[R.geometry[i].area / np.prod(mrr(R.geometry[i])) >= 0.8 and far(R.geometry[i], FUEL, 197) and far(R.geometry[i], unary_union(sites_of(('Place of Worship',))), 984) for i in c.index]] if len(c) else c
         if len(c): take((c.ac - PW_S).abs().idxmin(), 'PW', 'Place of Worship', 'your plans: 0.5-0.8 ac corner parcel across both rows (aim 0.75 ac for setback and parking); 1 per ~1,500 people')
         else:
-            z = P[(P.use == 'RE') & side(P) & ~P.main & ~P.kor]; z = z[z.geometry.distance(FUEL) > 197] if not FUEL.is_empty else z; order = z.geometry.centroid.distance(z.geometry.union_all().centroid).sort_values().index
+            z = P[(P.use == 'RE') & side(P) & ~P.main & ~P.kor]; z = z[z.geometry.distance(FUEL) > 197] if not FUEL.is_empty else z; order = z.geometry.centroid.distance(gap_target(sites_of(('Place of Worship',)), 1640)[0] if sites_of(('Place of Worship',)) else z.geometry.union_all().centroid).sort_values().index
             cands_ = []
             for n_ in sorted({4, 3, 5, 6, max(3, round(PW_S * AC / 7500))}):
                 g_ = best_group(order, n_, k=40); u_ = unary_union(list(P.loc[g_].geometry)); w_, l_ = mrr(u_)
@@ -4329,7 +4546,7 @@ def st_design_landuse(ctx):
     # ---------- 6. open space east of the 100 ft road, so children need not cross it ----------
     east = lambda c: c.geometry.centroid.within(WZ.buffer(5))
     if not ((R.use == 'POS') & east(R)).any():
-        c = R[(R.use == '') & (R.ac >= 0.4) & east(R)]; c = c[[has_front(g) for g in c.geometry]] if len(c) else c
+        c = R[(R.use == '') & (R.ac >= 0.4) & east(R)]; c = c[[has_front(g) and pos_shape(g) for g in c.geometry]] if len(c) else c
         if len(c): take(c.ac.idxmax(), 'POS', 'P.O.S', 'west of the stream (children need not cross it)')
     # ---------- 6b. deep irregular residential plots (> 150 ft, not on a major road, e.g. where curved roads meet) -> one defined open space if together >= 0.3 ac ----------
     deep = P[(P.use == 'RE') & ~P.main & ~P.kor & np.array([mrr(g)[1] > 150 for g in P.geometry])]
@@ -4344,18 +4561,20 @@ def st_design_landuse(ctx):
     POS_TARGET = (1.2 * nres0 * 7.2 / 1000) if not CUSTOM else fq('pos', 1) * fs('pos', 1.2)                      # LUSPA: about 1.2 ac of parks per 1,000 people (study: your plans have about half of this)
     def pos_area(): return (R.geometry[R.use == 'POS'].area.sum() + P.geometry[P.use == 'POS'].area.sum()) / AC
     def has_front(g): return g.boundary.intersection(ROADS.buffer(2)).length >= 30          # every open space reachable from a road (the landlocked Prestea-Brumasi P.O.S lesson)
-    for _ in range(4):
+    for _ in range(10):                                                        # every home within a 400 m walk of open space, sites spread out (farthest home first)
         homes = P[P.use == 'RE']; pts = list(homes.geometry.centroid); os_ = unary_union(list(R.geometry[R.use == 'POS']) + list(P.geometry[P.use == 'POS']))
         dmax = np.array([os_.distance(p) if not os_.is_empty else 1e9 for p in pts]) * 0.3048
-        if (dmax <= 500).all() or ((R.use == 'POS').sum() + (P.use == 'POS').sum() >= POS_CAP + 1 and pos_area() >= POS_TARGET): break
-        unc = homes[dmax > 500]; zone = unc.geometry.union_all().convex_hull.buffer(300)
+        if (dmax <= 400).all() or (R.use == 'POS').sum() + (P.use == 'POS').sum() >= POS_CAP + 3: break
+        tgt_, _ = gap_target(list(R.geometry[R.use == 'POS']) + list(P.geometry[P.use == 'POS']), 1312)
+        unc = homes[dmax > 400]; zone = tgt_.buffer(1312)
         SAU = unary_union(sa_sites) if sa_sites else shapely.Point(0, 0)
-        c = R[(R.use == '') & (R.ac >= 0.4) & R.geometry.intersects(zone) & (R.geometry.distance(SAU) > 197) & np.array([has_front(g) for g in R.geometry])]
-        if len(c): take(c.geometry.distance(unc.geometry.union_all().centroid).idxmin(), 'POS', 'P.O.S', 'homes more than 500 m from open space')
+        c = R[(R.use == '') & (R.ac >= 0.4) & R.geometry.intersects(zone) & (R.geometry.distance(SAU) > 197) & np.array([has_front(g) and pos_shape(g) for g in R.geometry])]
+        if len(c): take(c.geometry.distance(tgt_).idxmin(), 'POS', 'P.O.S', 'homes more than 400 m from open space (walking catchment)')
         else:
             unc = unc[unc.geometry.distance(SAU) > 197]
-            s_ = unc.geometry.centroid.distance(unc.geometry.union_all().centroid).idxmin()
-            g_ = assign_plots(chain_area(s_, 0.45), 'POS', 'P.O.S', 'homes more than 500 m from open space; compact plot group >= 0.45 ac')
+            if unc.empty: break
+            s_ = unc.geometry.centroid.distance(tgt_).idxmin()
+            g_ = assign_plots(chain_area(s_, 0.45), 'POS', 'P.O.S', 'homes more than 400 m from open space (walking catchment); compact plot group >= 0.45 ac')
     c = R[(R.use == '') & R.ac.between(0.12, 0.45)].sort_values('elev', ascending=False)
     if need('water_tank', 1) <= 0: pass
     elif len(c) and c.elev.iloc[0] >= P[P.use == 'RE'].elev.max() - 1.0: take(c.index[0], 'SU', 'UT (water tank)', 'highest ground; learned utility 0.2 ac')
@@ -4414,6 +4633,16 @@ def st_design_landuse(ctx):
         if place == 'school' and SCH.area > 0: return -g.distance(SCH)
         if place in ('market', 'gateway') and MK.area > 0: return -g.distance(MK)
         return -p_.distance(centre)
+    NUNITS = max(1, round(nres0 * 7.2 / 5000)); UNITS = units_(NUNITS)
+    if NUNITS > 1: log.append(('Neighbourhood units', f'{NUNITS} (about 5,000 people each)', 'core facilities (school, clinic, market, day care, community centre) one per unit, spread out'))
+    def spread_target(k_):
+        """core facilities: the neighbourhood unit furthest from the ones already placed; walking-catchment uses: farthest-first"""
+        same_ = sites_of(LABS.get(k_, (FAC_BY_ID[k_]['name'],)))
+        if not same_: return None
+        if k_ in ('basic_school', 'clinic', 'nbh_market', 'day_care', 'community_centre') and len(UNITS) > 1:
+            SU_ = unary_union(same_); u_ = max(UNITS, key=lambda c: SU_.distance(Point(float(c[0]), float(c[1])))); return Point(float(u_[0]), float(u_[1]))
+        if k_ in CATCH_FT: return gap_target(same_, CATCH_FT[k_])[0]
+        return None
     def place_one(k_, j_, size_):
         f_ = FAC_BY_ID[k_]; dec = DEC.get(f'{k_}#{j_}') or DEC.get(k_) or ('' if CUSTOM else 'take')       # the toolkit's own programme decides by itself
         if dec == 'skip': log.append((f_['name'], 'not placed (skipped by the planner)', '')); return
@@ -4425,10 +4654,11 @@ def st_design_landuse(ctx):
         c = c[[has_front(g) and g.area / np.prod(mrr(g)) >= 0.65 for g in c.geometry]] if len(c) else c
         if k_ == 'fuel' and len(c): c = c[[g.distance(MAIN) < 3 and far(g, SCH, 197) and far(g, FUEL, 984) for g in c.geometry]]
         if len(c):
-            i_ = max(c.index, key=lambda i: place_score(R.geometry[i], f_['place'])); take(i_, f_['use'], f_['name'], f'the planner\'s programme; leftover site ({f_["std"]})'); PLACED[k_] = PLACED.get(k_, 0) + 1; return
+            tk_ = spread_target(k_); i_ = (min(c.index, key=lambda i: R.geometry[i].distance(tk_)) if tk_ is not None else max(c.index, key=lambda i: place_score(R.geometry[i], f_['place']))); take(i_, f_['use'], f_['name'], f'the planner\'s programme; leftover site ({f_["std"]})'); PLACED[k_] = PLACED.get(k_, 0) + 1; return
         re_ = P[(P.use == 'RE')]
         if re_.empty: SHORT.append(dict(id=k_, k=j_, name=f_['name'], size_ac=round(size_, 2), plots=0, plots_ac=0, why='no residential land left')); return
-        seeds_ = sorted(re_.index, key=lambda i: -place_score(P.geometry[i], f_['place']))
+        tgt_k = spread_target(k_)
+        seeds_ = sorted(re_.index, key=(lambda i: P.geometry[i].distance(tgt_k)) if tgt_k is not None else (lambda i: -place_score(P.geometry[i], f_['place'])))
         grp_ = best_area_group(seeds_, size_, max_n=max(3, int(size_ * AC / 6000) + 2), k=10) if size_ <= 3.5 else []
         if size_ > 3.5 or (unary_union(list(P.loc[grp_].geometry)).area if grp_ else 0) < 0.75 * size_ * AC:                                                              # large site: whole residential blocks next to each other
             bl_ = re_.groupby('block').geometry.apply(lambda g: unary_union(list(g))); grp_, area_ = [], 0.0
@@ -4465,6 +4695,10 @@ def st_design_landuse(ctx):
             if name == 'Lorry / Taxi Station' and not far(g, HP, 1000): continue             # clinics 500 m from lorry parks (study); at least ~300 m on a small site                      # police / fire on a main road at the edge of the housing (study)
             if use in ('Ed P', 'H Po') and not far(g, FUEL, 1640 if use == 'H Po' else 197): continue      # fuel station: 60 m from schools / day care, 500 m from clinics
             if use == 'H Po' and not far(g, MK, 1640): continue
+            fam_ = {"Children's Playground": ("Children's Playground",), 'Day Care / Nursery': ('Day Care',), 'Second Clinic (Health)': ('Clinic', 'Second Clinic'), 'Sub-Market / Commercial': ('Sub-Market', 'Neighbourhood Shopping'),
+                    'Basic School (second)': ('Basic School',), 'Utility (U.T)': ('Utility',), 'Community Centre': ('Community Centre',), 'Police Post': ('Police',)}.get(name)
+            spc_ = {"Children's Playground": 787, 'Day Care / Nursery': 787, 'Second Clinic (Health)': 2362, 'Sub-Market / Commercial': 1969, 'Basic School (second)': 1575, 'Utility (U.T)': 600, 'Community Centre': 1969, 'Police Post': 1969}.get(name)
+            if fam_ and not far(g, unary_union(sites_of(fam_)), spc_): continue      # spread out: not right beside another of its kind
             take(i, use, name, why); quota[name] -= 1; done = True; break
         if done: continue
         pos = R[R.use == 'POS']
@@ -4476,7 +4710,7 @@ def st_design_landuse(ctx):
                 R.at[i, 'geometry'] = rest_; R.at[i, 'ac'] = rest_.area / AC; g = rest_; a_ = R.ac[i]
                 log.append(('Leftover land cut into plots', f'{len(newp)} plots', 'standard plots along the road edges of a large leftover piece'))
                 if a_ < 0.05: R.at[i, 'use'] = 'DROP'; continue
-        if not near_sa and (len(pos) < POS_CAP or pos_area() < POS_TARGET) and a_ >= 0.4 and has_front(g): take(i, 'POS', 'P.O.S', f'defined open space with road frontage (LUSPA 1.2 ac per 1,000 people: target {POS_TARGET:.1f} ac)'); continue
+        if not near_sa and (len(pos) < POS_CAP or pos_area() < POS_TARGET) and a_ >= 0.4 and has_front(g) and pos_shape(g) and far(g, unary_union(list(R.geometry[R.use == 'POS']) + list(P.geometry[P.use == 'POS'])), 787): take(i, 'POS', 'P.O.S', f'defined open space with road frontage (LUSPA 1.2 ac per 1,000 people: target {POS_TARGET:.1f} ac)'); continue
         nb = P[(P.use == 'RE') & (P.geometry.buffer(1).intersection(g).area > 20)]          # small piece: join the neighbouring plot if it stays a sensible size
         j = max(nb.index, key=lambda j: P.geometry[j].buffer(1).intersection(g).area) if len(nb) else None
         if j is not None and (P.geometry[j].area + g.area) < 18000 and mrr(unary_union([P.geometry[j], g]))[1] < 180:
@@ -4542,20 +4776,32 @@ def st_design_landuse(ctx):
         for k_ in LABS:
             base_ = nlab(k_)
             for j_ in range(max(0, fq(k_, 0) - base_)): place_one(k_, base_ + 1 + j_, fs(k_, FAC_BY_ID[k_]['size']))
-    # ---------- 7. S.A: every home within 500 m (Guidelines); each site on the lowest ground of the uncovered area, >= 60 m from school/health ----------
+    def is_corner(g):
+        """a corner plot: road frontage on two sides that meet (>= 45 deg apart)"""
+        try:
+            c_ = np.array(g.exterior.simplify(1.5).coords)[:, :2]; RB_ = ROADS.buffer(3); dirs = []
+            for a_, b_ in zip(c_[:-1], c_[1:]):
+                v_ = b_ - a_; l_ = float(np.hypot(*v_))
+                if l_ > 20 and RB_.contains(Point(*((a_ + b_) / 2))): dirs.append(v_ / l_)
+            return any(abs(float(x @ y)) < 0.71 for k_, x in enumerate(dirs) for y in dirs[k_ + 1:])
+        except Exception: return False
+    # ---------- 7. S.A: every home within 500 m (Guidelines); each site on the lowest ground of the uncovered area, >= 60 m from school/health; on a corner plot ----------
     sens = unary_union([SCH, HP, MK] + list(R.geometry[R.use.isin(['POS', 'Ed P', 'H Po'])]) + list(P.geometry[P.use.isin(['Ed P', 'H Po', 'POS'])])); sa_sites = []
     for _ in range(4 if fq('sa', 1) > 0 else 0):
         homes = P[P.use == 'RE']; pts = list(homes.geometry.centroid)
         dmax = np.array([min([g.distance(p) for g in sa_sites]) if sa_sites else 1e9 for p in pts]) * 0.3048
         if (dmax <= 500).all(): break
-        unc = homes[dmax > 500]; zone = unc.geometry.union_all().convex_hull.buffer(300)
+        unc = homes[dmax > 500]; cen_sa, _ = gap_target(sa_sites, 1640); zone = cen_sa.buffer(1640)
         c = R[(R.use.isin(['', 'GRN'])) & R.ac.between(0.18, 0.45) & (R.geometry.distance(sens) > 197) & R.geometry.intersects(zone) & (R.geometry.distance(MAIN) > 3) & (R.geometry.distance(CORR) > 3) & np.array([has_front(g) for g in R.geometry])].sort_values('elev')
         if len(c) and [far(g, HP, 984) for g in c.geometry].count(True): c = c[[far(g, HP, 984) for g in c.geometry]]      # prefer >= 300 m from the clinic (500 m rule for refuse points)
+        if len(c): c = c[[is_corner(g) for g in c.geometry]]                    # user 2026-11-23: S.A on a corner
         if len(c) and c.elev.iloc[0] <= unc.elev.quantile(0.25): sa_sites.append(take(c.index[0], 'SU', 'S.A', 'lowest ground of its area; every home within 500 m (Guidelines); learned S.A 0.28 ac'))
         else:
             cand = unc[(unc.geometry.distance(sens) > 197) & ~unc.main & ~unc.kor]
             if cand.empty: break
-            cen = unc.geometry.union_all().centroid; cand = cand[cand.elev <= cand.elev.quantile(0.4)]
+            cen = cen_sa; cand = cand[cand.geometry.distance(cen) < 2000] if (cand.geometry.distance(cen) < 2000).any() else cand; cand = cand[cand.elev <= cand.elev.quantile(0.4)]
+            cor_ = [is_corner(g) for g in cand.geometry]
+            if any(cor_): cand = cand[cor_]                                          # a corner plot to start the site from
             if [far(g, HP, 984) for g in cand.geometry].count(True): cand = cand[[far(g, HP, 984) for g in cand.geometry]]      # prefer >= 300 m from the clinic
             grp = None
             for s_ in cand.geometry.distance(cen).sort_values().index:               # low ground, as central to the uncovered homes as possible
@@ -4568,6 +4814,8 @@ def st_design_landuse(ctx):
             cand = P[(P.use == 'RE') & ~P.main & ~P.kor]; cand = cand[cand.geometry.distance(sens) > 197] if len(cand) else cand
             if cand.empty: log.append(('S.A', 'not placed', 'no plot left at least 60 m from schools, clinics and play areas')); break
             low_ = cand[cand.elev <= cand.elev.quantile(0.5)] if cand.elev.notna().any() else cand; low_ = low_ if len(low_) else cand
+            cor_ = [is_corner(g) for g in low_.geometry]
+            if any(cor_): low_ = low_[cor_]                                          # on a corner
             dist_ = low_.geometry.apply(lambda g: min([g.distance(x) for x in sa_sites if not x.is_empty] or [0]))
             g_ = chain_area(dist_.idxmax(), fs('sa', 0.3))
             sa_sites.append(assign_plots(g_, 'SU', 'S.A', 'the planner\'s number of S.A sites: low ground, as far as possible from the other S.A, >= 60 m from schools, clinics and play areas'))
@@ -4602,8 +4850,8 @@ def st_design_landuse(ctx):
         if len(halves) == 2 and min(h.area for h in halves) >= MINPLOT and all(frontage_dirs(h) for h in halves):
             P.at[i, 'geometry'] = halves[0]; NEWD.append(P.loc[[i]].assign(geometry=[halves[1]])); nsp += 1
         else:
-            g2 = g.buffer(1); hitR = [j for j in R.index if R.geometry[j].intersection(g2).area > 20]              # joins the green / facility site beside it (wedges go to facilities / open space)
-            hitP = [j for j in P.index if j != i and P.at[j, 'use'] not in ('RE', 'RA') and P.geometry[j].intersection(g2).area > 20]
+            g2 = g.buffer(1); hitR = [j for j in R.index if R.geometry[j].intersection(g2).area > 20 and not SMALLC(R, j)]              # joins the green / facility site beside it (wedges go to facilities / open space)
+            hitP = [j for j in P.index if j != i and P.at[j, 'use'] not in ('RE', 'RA', 'DROPD') and P.geometry[j].intersection(g2).area > 20 and not SMALLC(P, j)]   # never onto a plot already joined away (land lost)
             if hitR:
                 j = max(hitR, key=lambda j: R.geometry[j].intersection(g2).area); ug = unary_union([R.geometry[j], g]).buffer(0.3).buffer(-0.3)
                 if ug.geom_type == 'Polygon': R.at[j, 'geometry'] = ug; P.at[i, 'use'] = 'DROPD'; njoin += 1; continue
@@ -4652,7 +4900,7 @@ def st_design_landuse(ctx):
         sites = [('R', j) for j in R.index if FACU(R.at[j, 'use'])] + [('P', j) for j in P.index if FACU(P.at[j, 'use'])]
         for t, j in sites:
             T_ = R if t == 'R' else P
-            if j not in T_.index: continue
+            if j not in T_.index or SMALLC(T_, j): continue                 # a corner shop / S.A keeps its one corner plot
             u0 = T_.geometry[j]; area0 = u0.area
             for i in list(P.index[P.use.isin(['RE', 'RA'])]):
                 if i not in P.index: continue
@@ -4736,6 +4984,7 @@ def st_design_landuse(ctx):
     ax.legend(handles=luspa_handles(CNT) + [Patch(color='#2e8b57', label='Stream reserve (wooded)'), Patch(color='#8c8c8c', label='Main / existing roads'), Patch(color='#f5c242', label='40 ft collector'), Patch(color='#e6e6e6', label='30 ft local road')], loc='lower left', fontsize=9, title='LUSPA colour codes (Zoning Guidelines 2025)')
     x0, y0, x1, y1 = SITE.buffer(80).bounds; ax.set_xlim(x0, x1); ax.set_ylim(y0, y1); ax.set_xticks([]); ax.set_yticks([])
     ax.set_title(NAME + f': {len(res)} residential plots, about {round(len(res) * 7.2, -1):,.0f} people', fontsize=14)
+    plt.gcf().text(0.99, 0.004, CREDIT, ha='right', va='bottom', fontsize=7, color='#555')
     plt.savefig(OUT + 'landuse_preview.png', bbox_inches='tight', dpi=80)
 
 def st_design_audit(ctx):
@@ -4999,7 +5248,7 @@ def run(stages, ctx, a):
         fns[n](ctx); progress(100); print(f'   done in {time.time() - t0:.0f}s', flush=True)
         if ctx.get('stop'): break
 def main():
-    ap = argparse.ArgumentParser(description='LP Toolkit (see: python lp_toolkit.py guide)'); sub = ap.add_subparsers(dest='cmd', required=True)
+    ap = argparse.ArgumentParser(description='LP Toolkit by Urban GeoPlan (see: python lp_toolkit.py guide)'); sub = ap.add_subparsers(dest='cmd', required=True)
     for c in ('existing', 'design'):
         p = sub.add_parser(c); p.add_argument('--site', required=True); p.add_argument('--name', required=True); p.add_argument('--title'); p.add_argument('--out')
         p.add_argument('--from', dest='from_'); p.add_argument('--only')

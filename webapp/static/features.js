@@ -176,16 +176,29 @@ const FE = (() => {
       } });
   }
   function endSketch() { if (Sketch.active) Sketch.cancel(true); }
-  map.on('click', e => {
-    if (Sketch.active) return;
-    if (Date.now() - (window.LPBOX_T || 0) > 400 && pickBoundary(e)) return;
-    if (tool && !temp && act && !inputKind() && Date.now() - (window.LPBOX_T || 0) > 400) {          // lines / points of the editing layer: picked by position
-      const hit = hitTest(e.latlng); if (hit) { toggleSel(hit, e.originalEvent.shiftKey); if (tool === 'fattr') info(); } }
+  function polyHitOther(ll, terrain = false) {                         // an area of a click-through layer (blocks, plots before land use, terrain): the smallest one under the click
+    const pt = turf.point([ll.lng, ll.lat]); let best = null, ba = Infinity;
+    for (const x of layers) {
+      const g = results[x.path]; if (!g || !resGroup.hasLayer(g)) continue;
+      if (TERRAIN.has(kindOf(x.path)) !== terrain) continue;
+      g.eachLayer(l => { const o = l.options || {}; if (o.interactive !== false && o.pane !== 'topLines') return;
+        try { const gj = l.toGeoJSON(); if ((gj.geometry?.type || '').includes('Polygon') && turf.booleanPointInPolygon(pt, gj)) { const a = turf.area(gj); if (a < ba) { ba = a; best = { path: x.path, l }; } } } catch (er) {} });
+    }
+    return best;
+  }
+  map.on('click', e => {                                                // what Select picks (user 2026-11-23: every layer): outline > line / point > click-through area > editing layer > terrain
+    if (Sketch.active || Date.now() - (window.LPBOX_T || 0) < 400) return;
+    if (pickBoundary(e)) return;
+    const pick = o => { if (o && switchTo(o.path)) { toggleSel(o.l, e.originalEvent.shiftKey); if (tool === 'fattr') info(); return true; } return false; };
+    if (tool === 'fselect' && !temp && (pick(lineHitOther(e.latlng)) || pick(polyHitOther(e.latlng)))) return;
+    if (tool && !temp && act && !inputKind() && (tool !== 'fselect' || !TERRAIN.has(kindOf(act.path)))) {          // the editing layer: picked by position
+      const hit = hitTest(e.latlng); if (hit) { toggleSel(hit, e.originalEvent.shiftKey); if (tool === 'fattr') info(); return; } }
+    if (tool === 'fselect' && !temp && (pick(lineHitOther(e.latlng, true)) || pick(polyHitOther(e.latlng, true)))) return;
   });
   document.addEventListener('keydown', e => {
     if (e.target.matches('input, select, textarea') || Sketch.active) return;
     if (e.key === 'Escape' && tool) { clearSel(); }
-    if (e.key === 'Delete' && tool && sel.size && (!inputKind() || ['site', 'zones', 'stream'].includes(inputKind()))) { if (confirm(`Delete ${sel.size} feature(s)?`)) op('delete').catch(er => alert(er.message)); }
+    if (e.key === 'Delete' && sel.size && !['roads', 'existing'].includes(inputKind())) deleteSelected();      // any layer (roads: the road editor's Delete)
   });
   // ------------------------------------------------------------------ clicks on features
   // Select picks from any editable layer: the layer of the clicked feature becomes the editing layer
@@ -193,7 +206,7 @@ const FE = (() => {
   function boundaryAt(ll) {                                             // the site boundary / a redesign area whose outline is under the click (8 px)
     const pt = turf.point([ll.lng, ll.lat]), tol = 8 * 40075016.7 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);
     for (const k of ['zones', 'site']) {
-      if (!layers.some(x => x.path === INPUT_PATH[k])) continue; let hit = null;
+      if (!layers.some(x => x.path === INPUT_PATH[k]) || !map.hasLayer(inputs[k])) continue; let hit = null;      // a switched-off layer is not picked
       inputs[k].eachLayer(l => { if (hit) return; try { const ln = turf.polygonToLine(l.toGeoJSON()); const ls = ln.type === 'FeatureCollection' ? ln.features : [ln];
         if (ls.some(x => turf.pointToLineDistance(pt, x, { units: 'meters' }) < tol)) hit = l; } catch (er) {} });
       if (hit) return { k, l: hit };
@@ -211,6 +224,7 @@ const FE = (() => {
     if (Sketch.active) { Sketch.click(e.latlng); return true; }
     if (!tool || temp || !act) return false;
     if (pickBoundary(e)) return true;                                  // the site boundary / a redesign area outline wins over what lies under it
+    if (tool === 'fselect') { const o = lineHitOther(e.latlng); if (o && switchTo(o.path)) { toggleSel(o.l, e.originalEvent.shiftKey); return true; } }   // a line / point under the click wins over a polygon
     if (tool === 'fselect' && L_.path !== act.path && switchTo(L_.path)) { toggleSel(l, e.originalEvent.shiftKey); return true; }
     if (tool === 'fselect' && L_.path !== act.path && !layers.some(x => x.path === L_.path)) {        // a layer that is not editable (e.g. road reserves) is on top: the nearest drawn road under the click
       const pt = turf.point([e.latlng.lng, e.latlng.lat]), tol = 10 * 40075016.7 * Math.cos(e.latlng.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);
@@ -230,7 +244,24 @@ const FE = (() => {
     L.DomEvent.stop(e); toggleSel(l, e.originalEvent.shiftKey); if (tool === 'fattr') info(); return true;
   }
   // ------------------------------------------------------------------ hit test on the editing layer (whatever is drawn above it)
+  const TERRAIN = new Set(['contours', 'slope', 'steep']);
+  const kindOf = path => (LAYER_INDEX.find(l => l.path === path) || {}).kind;
+  function lineHitOther(ll, terrain = false) {                         // a line / point of any visible editable layer under the click (they are click-through, picked by position)
+    const pt = turf.point([ll.lng, ll.lat]), tol = 8 * 40075016.7 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);
+    let best = null, bd = tol;
+    for (const x of layers) {
+      const g = results[x.path]; if (!g || !resGroup.hasLayer(g)) continue;
+      if (TERRAIN.has(kindOf(x.path)) !== terrain) continue;            // terrain layers (contours ...) only when nothing else is under the click
+      g.eachLayer(l => { let gj; try { gj = l.toGeoJSON(); } catch (er) { return; } const t = gj.geometry?.type || ''; let d = Infinity;
+        try { if (t.includes('LineString')) d = turf.pointToLineDistance(pt, t === 'LineString' ? gj : turf.lineString(gj.geometry.coordinates.flat()), { units: 'meters' });
+              else if (t === 'Point') d = turf.distance(pt, gj, { units: 'meters' }); } catch (er) {}
+        if (d < bd) { bd = d; best = { path: x.path, l }; } });
+    }
+    return best;
+  }
+  function actVisible() { if (!act) return false; const k = inputKind(); return k ? map.hasLayer(inputs[k]) : !!(results[act.path] && resGroup.hasLayer(results[act.path])); }
   function hitTest(ll) {
+    if (!actVisible()) return null;                                     // a switched-off layer is never picked
     const pt = turf.point([ll.lng, ll.lat]), tol = 8 * 40075016.7 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);   // 8 px in metres
     let best = null, bestA = Infinity;
     for (const l of featLayers()) {
@@ -276,6 +307,12 @@ const FE = (() => {
   function sketchFrom(start, onDone) { startSketch('line', onDone); setTimeout(() => Sketch.click(L.latLng(start[1], start[0])), 0); }
   function selection() { return act ? { path: act.path, kind: inputKind() || (LAYER_INDEX.find(l => l.path === act.path) || {}).kind, layers: [...sel.values()] } : null; }
   function clearAll() { clearSel(); }
-  return { refreshLayers, capture, captureInput, close, boxSelect, openUse, selection, clearAll, open: t => open(t), applyGeoms, addFeatures, updateAttrs, sketchFrom,
+  async function deleteSelected() {                                       // the one Delete for every layer (user 2026-11-23)
+    if (!sel.size) { alert('Select features first (Select on the Edit tab).'); return false; }
+    const nm = act?.label || act?.path || 'this layer';
+    if (!confirm(`Delete ${sel.size} feature(s) from ${nm}?`)) return false;
+    try { await op('delete'); if (typeof flash === 'function') flash(`${nm}: deleted`); return true; } catch (e) { alert(e.message); return false; }
+  }
+  return { deleteSelected, refreshLayers, capture, captureInput, close, boxSelect, openUse, selection, clearAll, open: t => open(t), applyGeoms, addFeatures, updateAttrs, sketchFrom,
     fields: () => (act?.fields || []).filter(f => f.name !== '_fid'), values: () => selValues(), layerLabel: () => act?.label || '', undoLayer: () => op('undo'), isInput: () => !!inputKind(), get canBox() { return !!tool && !Sketch.active && !temp && tool !== 'fcreate'; }, get active() { return !!tool || Sketch.active; } };
 })();

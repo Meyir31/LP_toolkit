@@ -196,6 +196,10 @@ const Editor = (() => {
   const TITLE = { measure: 'Measure', pselect: 'Select plots', redemarcate: 'Re-demarcate blocks', psplit: 'Split plot', pmerge: 'Merge plots', select: 'Select', create: 'Create road', offset: 'Offset', extend: 'Extend', trim: 'Trim', split: 'Split', square: 'Square ends', attr: 'Attributes', delete: 'Delete', snap: 'Snapping' };
   let nextTool = null;
   function open(t) {
+    if (t === 'delete' && typeof FE !== 'undefined' && FE.deleteSelected) {       // Delete works on every layer: features other than roads go to the feature editor's delete
+      const fs0 = FE.selection();
+      if (fs0 && fs0.layers.length && !['roads', 'existing'].includes(fs0.kind)) { FE.deleteSelected(); return; }
+    }
     nextTool = t; if (typeof FE !== 'undefined') FE.close();
     if (!P) return alert('Create or choose a project first');
     close(); tool = t; picking = 'select'; sidePick = null;
@@ -254,7 +258,7 @@ const Editor = (() => {
     if (t === 'pmerge') q('#pmg').onclick = async () => { try { await post(`/api/projects/${P.id}/plots/merge`, { plot_ids: [...pSel.keys()] }); clearPlots(); await reloadPlots(); refresh(); } catch (e) { alert(e.message); } };
     if (t === 'snap') { q('#sn').onchange = () => snapOn = q('#sn').checked; q('#st').onchange = () => SNAP_M = +q('#st').value || 12; q('#sall').onclick = () => { push(); let n = 0; inputs.roads.eachLayer(l => { if (snapEnds(l)) n++; }); saveInput('roads'); alert(`${n} road(s) snapped.`); }; }
   }
-  function deleteSel() { const ls = alive(sel); if (!ls.length) return alert('Select roads first.'); push(); ls.forEach(l => { inputs.roads.removeLayer(l); inputs.existing.removeLayer(l); }); sel.clear(); saveInput('roads'); saveInput('existing'); refresh(); }
+  function deleteSel() { const ls = alive(sel); if (!ls.length) { const fs0 = typeof FE !== 'undefined' && FE.selection(); if (fs0 && fs0.layers.length) return FE.deleteSelected(); return alert('Select the features to delete first (Select on the Edit tab).'); } push(); ls.forEach(l => { inputs.roads.removeLayer(l); inputs.existing.removeLayer(l); }); sel.clear(); saveInput('roads'); saveInput('existing'); refresh(); }
   // ------------------------------------------------------------------ offset
   function hintOffset() { if (!q('#ohint')) return; const s = q('#os').value; q('#ohint').textContent = !alive(sel).length ? 'Select the road(s) to offset (click, Shift+click, Ctrl+drag).' : s === 'pick' && !sidePick ? 'Now click on the map on the side where the new road should go.' : 'Check the dashed preview, then Apply.'; }
   function offsetResults() {

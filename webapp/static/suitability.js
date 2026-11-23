@@ -50,7 +50,8 @@ const SUIT = (() => {
     <div class="row"><label class="tl"><input type="checkbox" class="sheat" checked> Heat map</label><input class="sop" type="range" min="0.1" max="1" step="0.05" value="0.7" title="Heat map opacity" style="width:110px">
       <label class="tl splanrow" hidden><input type="checkbox" class="sapply" checked> Apply accepted sites to the plan now</label></div>
     <div class="slegend mini"><span class="sbar"></span> 0 unsuitable &nbsp; 100 best &nbsp; (blank = excluded: stream, steep, roads, required distances)</div>
-    <div class="smsg mini"></div><div class="slist"></div>`;
+    <div class="smsg mini"></div><div class="slist"></div>
+    <div class="row sfitrow"><button class="ghost sfit" title="Design the roads again around every located facility (exact outlines), keep your own roads, then remake the plan">Fit roads to facilities</button></div>`;
   const $p = s => pane.querySelector(s);
   async function open() {
     if (!P) return alert('Choose a project first.');
@@ -88,6 +89,7 @@ const SUIT = (() => {
   pane.addEventListener('click', async e => {
     if (e.target.classList.contains('sclose')) { pane.hidden = true; clear(); return; }
     if (e.target.classList.contains('sgo')) return find();
+    if (e.target.classList.contains('sfit')) { window.fitRoadsToFacilities && fitRoadsToFacilities(); return; }
     if (e.target.classList.contains('sclr')) { await post(`/api/projects/${P.id}/suitability/clear_rejected`, { fid: $p('.sfac').value }); alert('Rejected sites for this facility forgotten.'); return; }
     const card = e.target.closest('.scard'); if (!card || !R) return; const c = R.candidates.find(x => x.rank === +card.dataset.r); if (!c) return;
     if (e.target.classList.contains('szoom')) { map.fitBounds(c._lay.getBounds(), { padding: [60, 60] }); return; }

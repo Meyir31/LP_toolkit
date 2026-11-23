@@ -14,7 +14,13 @@ const FT = 0.3048; let SNAP_M = 12, snapOn = true;
 let P = null, poll = null, activeDraw = null, drawer = null, width = 30;
 
 // ------------------------------------------------------------------ map
-const map = L.map('map', { renderer: L.canvas({ tolerance: 7 }) }).setView([5.6, -0.19], 13);
+const map = L.map('map', { renderer: L.canvas({ tolerance: 7 }), zoomSnap: 0.1, zoomDelta: 0.5, wheelPxPerZoomLevel: 90 }).setView([5.6, -0.19], 13);   // finer zoom steps (user 2026-11-23)
+// Shift + mouse wheel: zoom in small steps (0.2 of a level) around the pointer
+map.getContainer().addEventListener('wheel', e => {
+  if (!e.shiftKey) return; e.preventDefault(); e.stopPropagation();
+  const dz = (e.deltaY || e.deltaX) < 0 ? 0.2 : -0.2, z = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), map.getZoom() + dz));
+  map.setZoomAround(map.mouseEventToContainerPoint(e), Math.round(z * 10) / 10, { animate: false });
+}, { capture: true, passive: false });
 const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 19, attribution: 'Esri World Imagery' }).addTo(map);
 const gsat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { subdomains: '0123', maxZoom: 21, maxNativeZoom: 20, attribution: 'Imagery &copy; Google' });
 const ghyb = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains: '0123', maxZoom: 21, maxNativeZoom: 20, attribution: 'Imagery &copy; Google' });
@@ -49,6 +55,16 @@ function opSlider(path, onChange) {                                      // 'Tra
   const r = w.querySelector('input'); r.oninput = () => { w.querySelector('.opv').textContent = r.value + '%'; setOp(path, 1 - r.value / 100); onChange(); };
   return w;
 }
+// visibility of the drawn layers (site boundary, roads you drew, road reserves, existing roads, streams, redesign areas), remembered per project
+let DRAWN_VIS = {}; try { DRAWN_VIS = JSON.parse(localStorage.getItem('lp_drawn_vis') || '{}'); } catch (e) {}
+const drawnLayer = k => k === 'reserves' ? reserveLayer : inputs[k];
+function drawnVisible(k) { const v = DRAWN_VIS[(P?.id || '') + '|' + k]; return v === undefined ? true : !!v; }
+function setDrawnVisible(k, on, keep = true) {
+  const g = drawnLayer(k); if (!g) return;
+  if (on && !map.hasLayer(g)) g.addTo(map); if (!on && map.hasLayer(g)) map.removeLayer(g);
+  if (keep) { DRAWN_VIS[(P?.id || '') + '|' + k] = on; try { localStorage.setItem('lp_drawn_vis', JSON.stringify(DRAWN_VIS)); } catch (e) {} }
+}
+function applyDrawnVisibility() { ['site', 'roads', 'reserves', 'existing', 'stream', 'zones'].forEach(k => setDrawnVisible(k, drawnVisible(k), false)); }
 function zoomBtn(ref) { const z = document.createElement('button'); z.className = 'ghost lzoom'; z.title = 'Zoom to layer (or right-click the row)'; z.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5M8 10.5h5M10.5 8v5"/></svg>'; z.onclick = e => { e.preventDefault(); e.stopPropagation(); window.zoomToLayer && zoomToLayer(ref); }; return z; }
 function layerRow(L_, lab, cb) { const row = document.createElement('div'); row.className = 'lrow'; row.dataset.path = L_.path; lab.append(cb, ' ' + L_.label); row.append(lab, zoomBtn({ path: L_.path }), opSlider(L_.path, () => applyOp(L_.path))); return row; }
 function styleInput(kind, layer) {
@@ -59,6 +75,7 @@ function styleInput(kind, layer) {
 }
 function addInputLayer(kind, l) {
   l.feature = l.feature || { type: 'Feature', properties: {}, geometry: null }; l.feature.properties = l.feature.properties || {};
+  if (kind === 'site' || kind === 'zones') l.options.interactive = false;      // outline only: clicks inside reach the plots / facilities under it (Select picks the outline itself)
   styleInput(kind, l); l.on('click', e => onFeatureClick(kind, l, e)); inputs[kind].addLayer(l);
   if (kind === 'roads') l.bindTooltip(() => `${l.feature.properties.width_ft || 30} ft${l.feature.properties.locked ? ' (yours, kept on redesign)' : ''}`, { sticky: true });
 }
@@ -207,7 +224,19 @@ function computeAngles() {
   }
   $('#angleSum').textContent = n ? `${n} junctions: ${bad} below 70°, ${warn} at 70-80°${show ? '' : ' (zoom in to see all)'}` : '';
 }
-$('#showAngles').onchange = computeAngles; map.on('zoomend', updateAngles);
+$('#showAngles').onchange = () => { computeAngles(); document.querySelectorAll('[data-x=angles]').forEach(b => b.classList.toggle('on', $('#showAngles').checked)); try { localStorage.setItem('lp_angles', $('#showAngles').checked ? '1' : '0'); } catch (e) {} };
+try { if (localStorage.getItem('lp_angles') === '0') $('#showAngles').checked = false; } catch (e) {}
+map.on('zoomend', updateAngles);
+window.fitRoadsToFacilities = async () => {
+  if (!P) return alert('Choose a project first.');
+  if (!confirm('Adjust the roads slightly around the located facilities (trim roads through them, roads along their open sides, reconnect cut roads, shift a short road beside them), then re-cut only the blocks touched?')) return;
+  try {
+    const r = await post(`/api/projects/${P.id}/fit_roads`, {});
+    loadInput('roads', await api(`/api/projects/${P.id}/input/roads`)); refreshInputState();
+    await reloadKinds(['plots_design', 'roads', 'blocks', 'lines']); if (typeof markSaved === 'function') markSaved(true);
+    alert(`Roads fitted to ${r.sites} located facilit${r.sites === 1 ? 'y' : 'ies'}: ${r.trimmed} road(s) trimmed, ${r.shifted} shifted, ${r.edge_roads} edge road(s) added, ${r.joined} reconnected; ${r.facilities_applied} facility site(s) set in the plan.` + (r.blocked.length ? ` Note: ${r.blocked.join('; ')}.` : '') + ' Undo on the roads layer reverses the roads.');
+  } catch (e) { alert(e.message); }
+};
 
 // ------------------------------------------------------------------ projects
 async function loadProjects(sel) {
@@ -378,7 +407,13 @@ async function refreshStatus() {
   if (window.FAC) FAC.status(s);
   else { b.textContent = 'ready'; b.className = 'badge'; }
   if (!s.running && s.pending_load && !s.failed) {                // a road design / redesign finished: load it for editing
-    try { const fc = await post(`/api/projects/${P.id}/load_draft`); loadInput('roads', fc); inputs.zones.clearLayers(); saveInput('zones'); refreshInputState(); $('#toolHint').textContent = 'Design loaded: edit it with the tools, or draw an area and Redesign.'; } catch (e) { console.warn(e); }
+    const fitting = s.pending_load === 'fit';
+    try { const fc = await post(`/api/projects/${P.id}/load_draft`); loadInput('roads', fc); inputs.zones.clearLayers(); saveInput('zones'); refreshInputState();
+      if (fitting) {                                                  // roads fitted to the located facilities: remake the plan from them
+        alert('Roads fitted around the located facilities. Remaking the plan from the new roads...');
+        await post(`/api/projects/${P.id}/run`, { workflow: 'design', from: 'roads', steep: +$('#steep').value, stream_buffer: +$('#streamBuf').value, roads_mode: 'file', chamfer: !!$('#chamfer')?.checked });
+        refreshStatus(); return;
+      } $('#toolHint').textContent = 'Design loaded: edit it with the tools, or draw an area and Redesign.'; } catch (e) { console.warn(e); }
   }
   if (wasRunning && !s.running) { await loadResults(true); loadTerrain(); if (typeof FE !== 'undefined') FE.refreshLayers(); } wasRunning = s.running;
 }
@@ -455,10 +490,14 @@ async function loadResults(fresh) {
     const lab = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = DEFAULT_ON.has(L_.kind) || !!(results[L_.path] && resGroup.hasLayer(results[L_.path]));
     cb.onchange = () => toggleLayer(L_, cb.checked); $('#layerList').append(layerRow(L_, lab, cb)); if (cb.checked) toggleLayer(L_, true);
   }
+  applyDrawnVisibility();
   const drawn = [['site', 'Site boundary'], ['roads', 'Roads you drew'], ['reserves', 'Road reserves (drawn roads)'], ['existing', 'Existing roads to keep'], ['stream', 'Streams / water'], ['zones', 'Redesign areas']]
     .filter(([k]) => k === 'reserves' ? inputs.roads.getLayers().length || inputs.existing.getLayers().length : inputs[k].getLayers().length);
   if (drawn.length) { const h = document.createElement('div'); h.className = 'lgh'; h.textContent = 'Drawn on the map'; $('#layerList').append(h);
-    for (const [k, lab_] of drawn) { const row = document.createElement('div'); row.className = 'lrow'; row.dataset.input = k; const s_ = document.createElement('span'); s_.className = 'lname'; s_.textContent = lab_; row.append(s_, zoomBtn({ input: k }), opSlider('in:' + k, () => applyInputOp(k))); $('#layerList').append(row); }
+    for (const [k, lab_] of drawn) { const row = document.createElement('div'); row.className = 'lrow'; row.dataset.input = k;
+      const lab = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = drawnVisible(k);       // every drawn layer can be switched off (then it cannot be clicked / selected either)
+      cb.onchange = () => setDrawnVisible(k, cb.checked); lab.append(cb, ' ' + lab_);
+      row.append(lab, zoomBtn({ input: k }), opSlider('in:' + k, () => applyInputOp(k))); $('#layerList').append(row); }
   }
   applyInputOp('reserves');
   const kinds = new Set(list.map(l => l.kind));

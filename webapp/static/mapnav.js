@@ -50,6 +50,18 @@
     nav.querySelector('.gb').insertAdjacentHTML('beforeend', `<button data-x="zsel" title="Zoom to the selected features">${ic('<rect x="4" y="4" width="10" height="10" fill="#E3F2FD" stroke="#1E88E5" stroke-dasharray="2 2"/><circle cx="15.5" cy="15.5" r="4.5" stroke="#1E88E5"/><path d="M19 19l3 3" stroke="#1E88E5" stroke-width="2.2"/>')}<span>Selection</span></button>`);
     nav.querySelector('[data-x=zsel]').onclick = e => { e.stopPropagation(); zoomToSelection(); };
   }
+  // junction angle labels on / off (Map > Layer), and Fit roads to facilities (Design > Roads)
+  const layG = [...rib.querySelectorAll(':scope > .grp')].find(x => x.dataset.rt === 'map' && /Layer/.test(x.querySelector('.gl')?.textContent || ''));
+  if (layG) {
+    layG.querySelector('.gb').insertAdjacentHTML('beforeend', `<button data-x="angles" title="Show / hide the junction angles on the roads">${ic('<path d="M4 20h16M4 20L15 6" stroke="#37474F"/><path d="M10 20a6 6 0 0 0-2.2-4.6" stroke="#E53935" stroke-width="2"/><text x="12.5" y="17" font-size="7" fill="#E53935" stroke="none" font-family="sans-serif">90</text>')}<span>Angles</span></button>`);
+    const ab = layG.querySelector('[data-x=angles]'); const cb = document.getElementById('showAngles');
+    if (cb) { ab.classList.toggle('on', cb.checked); ab.onclick = e => { e.stopPropagation(); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }; }
+  }
+  const roadsG = [...rib.querySelectorAll(':scope > .grp')].find(x => x.dataset.rt === 'design' && /Roads/.test(x.querySelector('.gl')?.textContent || ''));
+  if (roadsG) {
+    roadsG.querySelector('.gb').insertAdjacentHTML('beforeend', `<button data-x="fitroads" title="Design the roads again around the located facilities (exact outlines), keep your own roads, then remake the plan">${ic('<rect x="8" y="8" width="8" height="8" fill="#F3E5F5" stroke="#6a1b9a" stroke-dasharray="2 1.5"/><path d="M3 5h18M3 19h18M5 3v18M19 3v18" stroke="#8d8d8d" stroke-width="1.8"/>')}<span>Fit roads</span></button>`);
+    roadsG.querySelector('[data-x=fitroads]').onclick = e => { e.stopPropagation(); window.fitRoadsToFacilities && fitRoadsToFacilities(); };
+  }
   const lc = document.querySelector('.lblctl');
   if (lc) {
     const g = document.createElement('div'); g.className = 'grp'; g.dataset.rt = 'map';

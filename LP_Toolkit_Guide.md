@@ -1,5 +1,7 @@
 # LP Toolkit: local plan preparation guide
 
+LP Toolkit is developed and maintained by **Urban GeoPlan**, a geospatial and urban planning initiative in Ghana focused on spatial analytics, urban planning and digital mapping solutions.
+
 Everything learned while preparing the test local plans (test.kml, Tests 2 to 5, Obusomase, Phase One, STMA scheme study) in one place.
 This guide is printed by `python lp_toolkit.py guide` and is also written next to the script as `LP_Toolkit_Guide.md`.
 
@@ -37,7 +39,24 @@ Two workflows, each a chain of stages that read and write files in one output fo
 | landuse | Facility programme (LUSPA + STMA rates and site shapes, section 7) |
 | audit | Design audit: every flaw with location and suggested fix (section 8). Run after every design |
 
-**Web app.** `run_webapp.bat` opens the same workflows in the browser (http://localhost:5050; `run_webapp.bat --lan` lets other computers on the office network open it). Projects are kept in `D:/Work/2026/Machine Learning/LP_Projects/`. Draw or upload the site, roads (with widths), existing roads and streams on the satellite map; choose the road option; run with a live log; view the results as map layers (plots by use, audit findings) and download everything as a zip.
+**Web app.** `run_webapp.bat` opens the same workflows in the browser (http://localhost:5050; `run_webapp.bat --lan` lets other computers on the office network open it). Projects are kept in `D:/Work/2026/Machine Learning/LP_Projects/`. Draw or upload the site, roads (with widths), existing roads and streams on the satellite map; choose the road option; run with a live log; view the results as map layers (plots by use, audit findings) and download everything as a zip. The header buttons open this Guide, the About box (what the toolkit does, Urban GeoPlan), the 3D view and the LUSPA standards.
+
+Web app tools (ribbon tabs Project, Map, Edit, Design, Analysis, View):
+
+| Tool | What it does |
+|---|---|
+| Contents | Every layer grouped (Land use and plots, Roads, Buildings, Terrain and environment, Checks) with a tick box to show / hide it, including the roads you drew; drag to change the drawing order. Right-click a layer (or its zoom button) for Zoom to layer; Zoom to selection on the Map tab |
+| Navigation | Mouse wheel zooms in half steps; hold **Shift** and scroll to zoom in fine steps |
+| Labels | Map tab: labels on / off and the attribute to show (use, name, area ...), with overlap avoidance |
+| Angles | Map tab: show / hide the junction angle marks on the roads |
+| Select | Works on every layer: a click picks the line or point under it first, then the smallest area (plot, facility, block, road reserve), terrain layers last. Hidden layers are never picked: untick a layer to reach what is under it. Shift + click adds to the selection |
+| Delete | Deletes the selection on any editable layer (ribbon Delete or the Delete key); one undo step per edit |
+| Change use | Gives selected plots a new use; your changes are kept when the plan is updated (use_overrides.geojson) |
+| Coordinate system | Project tab: any coordinate system that covers Ghana (Ghana National Grid ft, Ghana Metre Grid, UTM 30N / 31N, WGS 84 ...). Changes the coordinates shown and the exported files; the work itself stays in EPSG:2136 |
+| Facilities and services | The facility checklist (section 7) |
+| Suitability | Where a facility could go (section 7): heat map and the best sites; Accept, Reject or Relocate each one |
+| Fit roads | After accepting a suitability site on a designed plan: the roads are adjusted slightly around it (section 7) |
+| 3D view | Terrain, land use (open spaces included) and buildings by height |
 
 **Site analysis comes first.** The `site` stage prepares the terrain before any road is drawn: Copernicus 30 m DEM, contours at an interval adapted to the relief (1, 2, 5, 10 m...), slope in percent, slope classes (flat 0-5%, gentle 5-10%, moderate 10-18%, steep 18-30%: no roads straight downhill, very steep > 30%: keep green) and the steep-slope reserve (slopes >= `--steep` %, default 30, pieces >= 0.5 ac kept green and excluded from blocks). Outputs: `<P>Contours.shp`, `<P>Slope_classes.shp`, `<P>Slope_percent.tif`, `<P>Steep_slope_reserve.shp`, `<P>Terrain_summary.json`, `<P>Site_analysis.png`, map overlays. In the web app: "Prepare site analysis", then review the terrain layers before planning roads.
 
@@ -168,15 +187,29 @@ Programme: LUSPA Manual 4.6.3 + the 2025 Guidelines mandatory list. Rates, site 
 | Day care | 0.6-0.7 ac square across both rows | neighbourhood cluster by the market; 60 m from a fuel station |
 | Clinic | about 1 ac (200 x 240 ft) across both rows | near the school, as far as the site allows (LUSPA 500 m) from market, lorry park, S.A, fuel; second clinic only above 5,000 people |
 | Market | about 1 ac per section; main market with lorry park 5 ac for 20,000 | gateway corner; lorry park on the main road side |
-| Corner shop | at least 0.25 ac (two plots where one is smaller) | collector corners |
+| Corner shop | at least 0.25 ac (two plots where one is smaller) | corner plots at junctions (collector corners when the toolkit places them) |
 | Fuel station | 0.5-1 ac junction corner | main road only; 60 m from schools / day care, 500 m from clinics, 30 m from streams, 300 m from the next station |
 | Place of worship | 0.5-0.8 ac (aim 0.75) corner parcel across both rows | 1 per ~1,500 people; away from fuel and S.A |
-| P.O.S | 1-1.5 ac within about 500 m of every home; total about 1.2 ac per 1,000 people | wedges, corners, low ground; every open space with road frontage |
+| P.O.S | 1-1.5 ac within about 400 m of every home; total about 1.2 ac per 1,000 people | spread over the plan (farthest homes first); wedges, corners, low ground; every open space with road frontage; never landscaped green or residential plots notched into it |
 | Children's playground | 0.5-1 ac | in the neighbourhood cluster, within about 400 m of every home |
-| S.A | 0.2-0.45 ac on a road a refuse truck can use | every home within 500 m; 60 m from schools, day care, playgrounds, clinics; off the main road |
+| S.A | 0.2-0.45 ac on a corner plot, on a road a refuse truck can use | every home within 500 m; 60 m from schools, day care, playgrounds, clinics; off the main road |
 | Police / fire | police 2.5-3 ac (LUSPA) | on the main road at the edge of the housing |
 
-**Facility programme (web app "Facilities and services", after the site analysis).** Either the toolkit decides (the counts the population needs: `python lp_toolkit.py facilities --pop N` prints the catalogue of about 60 services, all levels, from LUSPA 2025 and the study) or the planner ticks each facility with its number, site size and, optionally, its location (a point: a site of that size is shaped across the full depth of the block that holds it; or the exact outline). Saved as facilities.json (mode auto | custom, items {id: on, n, size_ac}, decisions) and facility_sites.geojson (fac_id); passed with `--facilities` / `--facility-sites`. Located sites are kept clear by the road designer and taken out of the blocks before subdivision. Learned facilities (school, playground, market, fuel, clinic, worship, day care, P.O.S, S.A, U.T, shops, police post, lorry park) keep their own placement rules with the planner's numbers and sizes; the others (SHS, hospitals, police station, cemetery, hotels, utilities ...) go to a leftover site of the right size by their siting preference. When a requested facility does not fit, the land-use stage writes shortfall.json and the run pauses: for each item the planner chooses Take the plots / Skip / Reduce the size, and the run continues from land use. In the toolkit's own programme it takes the plots by itself.
+**Facility programme (web app "Facilities and services", after the site analysis).** Either the toolkit decides (the counts the population needs: `python lp_toolkit.py facilities --pop N` prints the catalogue of about 60 services, all levels, from LUSPA 2025 and the study) or the planner ticks each facility with its number, site size and, optionally, its location (a point or an outline). Saved as facilities.json (mode auto | custom, items {id: on, n, size_ac}, decisions) and facility_sites.geojson (fac_id); passed with `--facilities` / `--facility-sites`. Located sites are taken out of the blocks before subdivision. Learned facilities (school, playground, market, fuel, clinic, worship, day care, P.O.S, S.A, U.T, shops, police post, lorry park) keep their own placement rules with the planner's numbers and sizes; the others (SHS, hospitals, police station, cemetery, hotels, utilities ...) go to a leftover site of the right size by their siting preference. When a requested facility does not fit, the land-use stage writes shortfall.json and the run pauses: for each item the planner chooses Take the plots / Skip / Reduce the size, and the run continues from land use. In the toolkit's own programme it takes the plots by itself.
+
+**Located facilities fit into the designed roads (user, 2026-11-23).** The road designer lays the grid as usual (no ring roads around the sites, no site at an angle to the grid); then each located facility takes the block where the planner put it:
+- the whole block when it is about the right size;
+- a stretch of the block across its full depth (frontage on both roads) when the block is much bigger; a leftover too small for a plot joins the site;
+- neighbouring blocks joined into one site when one block is too small (the local road between them is dropped; never across a collector, main, existing or planner's road).
+Sizes therefore follow the blocks (two whole blocks for a 3 ac school, for example); the run log notes any site smaller than asked. The fitted outlines are saved back to facility_sites.geojson (backup `.before_fit`), so the map, the land use and Fit roads use the same outline. A planner's outline that crosses a road is fitted the same way at the land-use stage.
+
+**Corner shops and S.A on corner plots (user, 2026-11-23).** A located corner shop or S.A takes the corner of the block nearest where it was put: one plot row deep, fronting both roads at the junction. S.A sites the toolkit places itself start from a corner plot. Neither grows by taking in the plots or leftover pieces beside it.
+
+**Facilities spread out (neighbourhood distribution, user 2026-11-23).** The homes are grouped into neighbourhood units of about 5,000 people; core facilities (basic school, clinic, market, day care, community centre) go one per unit, to the unit furthest from the ones already placed. Walking-catchment uses go farthest-first: P.O.S until every home is within 400 m (each at least 100 ft wide, length up to 3 x width), S.A within 500 m, worship within 500 m. The same kind is kept apart (playgrounds and day cares about 240 m, clinics 720 m, markets and community centres 600 m, second schools 480 m).
+
+**Suitability (web app, Design > Suitability).** For any facility in the catalogue: a heat map of every 25 ft cell scored from the site analysis (slope, high / low ground, streams, steep reserve) and the standards (distance rules, catchments, road access where the facility needs an existing main road; elsewhere the road design provides access), and the best sites of the required size, spread over the whole planning area so that each serves the most homes. Type how many suggestions you want. Before the roads the sites are squares running with the road grid; on a designed plan they are compact plot groups. For each: **Accept** (it becomes a located facility; Apply to the plan now), **Reject** (never suggested again), or **Relocate** (drag it, or click Relocate then the new place: it snaps to the plots there and is scored again).
+
+**Fit roads (after accepting a suitability site on a designed plan).** Slight changes only: designed roads through the site are trimmed to its edge, a short road just beside it is shifted onto its edge, sides without frontage get an edge road, cut road ends are reconnected; your own roads and the existing roads never move (reported instead). Only the blocks touched are re-plotted.
 
 ## 8. Checks to run before presenting anything (self-audit)
 
@@ -188,7 +221,7 @@ Layout (`design` audit):
 Existing situation:
 - Footprints: compare counts and roof-area IoU with the building database; look at a crop in the dense core and a crop in a planned area before accepting.
 - Plots: buildings cut by plot lines, plots deeper than 60 m, open / yard plots, interior plots, overlap = 0, coverage about 100%. Look at curved blocks and block ends on the image before presenting.
-- Maps: legend outside the map frame (never covering the site); building outlines in a colour distinct from plot lines; no empty legend entries; title with the place name.
+- Maps: legend outside the map frame (never covering the site); building outlines in a colour distinct from plot lines; no empty legend entries; title with the place name. Map sheets carry the credit "Prepared with LP Toolkit · Urban GeoPlan".
 
 Reporting rules: say what failed and what is uncertain; give numbers; no proposals unless asked; no em dashes in documents (use colons, commas or parentheses).
 

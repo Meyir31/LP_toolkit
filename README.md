@@ -1,4 +1,8 @@
+<img src="webapp/static/brand/logo.png" alt="Urban GeoPlan" width="72" align="right">
+
 # LP Toolkit
+
+**Developed by [Urban GeoPlan](https://www.linkedin.com/company/107451042/).**
 
 Local plan preparation for Ghana: existing-situation surveys and new layouts (roads, plot subdivision, facility programme and land use), following the LUSPA Revised Zoning Guidelines and Planning Standards (2025) and rules learned from approved local plans.
 
@@ -37,3 +41,10 @@ env\Scripts\python lp_toolkit.py design --site site.geojson --name MyPlan --road
 env\Scripts\python lp_toolkit.py existing --site site.geojson --name MyArea --buildings fast
 env\Scripts\python lp_toolkit.py facilities --pop 5000
 ```
+
+
+## About
+
+LP Toolkit is developed and maintained by **Urban GeoPlan**, a geospatial and urban planning initiative in Ghana focused on spatial analytics, urban planning and digital mapping solutions ([LinkedIn](https://www.linkedin.com/company/107451042/)). Copyright (c) 2026 Urban GeoPlan. All rights reserved.
+
+The Urban GeoPlan logo is `webapp/static/brand/logo.png` (header, About box, favicon); replace that file to update it everywhere.
