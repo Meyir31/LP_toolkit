@@ -244,7 +244,7 @@ const FE = (() => {
     L.DomEvent.stop(e); toggleSel(l, e.originalEvent.shiftKey); if (tool === 'fattr') info(); return true;
   }
   // ------------------------------------------------------------------ hit test on the editing layer (whatever is drawn above it)
-  const TERRAIN = new Set(['contours', 'slope', 'steep']);
+  const TERRAIN = new Set(['contours', 'slope', 'steep', 'water']);
   const kindOf = path => (LAYER_INDEX.find(l => l.path === path) || {}).kind;
   function lineHitOther(ll, terrain = false) {                         // a line / point of any visible editable layer under the click (they are click-through, picked by position)
     const pt = turf.point([ll.lng, ll.lat]), tol = 8 * 40075016.7 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);

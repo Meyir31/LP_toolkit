@@ -76,7 +76,7 @@ EXIST_LUSPA = {'Residential': 'Re', 'Mixed use (shop + residence)': 'BM', 'Comme
                'Institutional / large commercial (verify)': 'CC', 'Recreation': 'PS', 'Industrial': 'InD', 'Mixed use (industrial + commercial)': 'IS',
                'Mixed use (commercial + industrial)': 'IS', 'Agricultural': 'Ag', 'Open / yard (no building)': 'VAC', 'Unconfirmed (verify)': 'UNC', 'Utility': 'SU'}
 DESIGN_LUSPA = {'RE': 'Re B', 'RA': 'Re A', 'MU': 'BM', 'BM': 'BM', 'Com A': 'Com', 'CIV': 'CC', 'TR': 'TL', 'PW': 'PW', 'H Po': 'H', 'Ed P': 'Ed P', 'Ed S': 'Ed S', 'Ed T': 'Ed T', 'HD': 'H', 'HR': 'H', 'HT': 'H',
-                'POS': 'PS', 'GRN': 'CA', 'SU': 'SU', '': 'VAC'}
+                'POS': 'PS', 'GRN': 'CA', 'SU': 'SU', 'LI': 'LI', '': 'VAC'}
 # ---------------------------------------------------------------------------------------------------------------------
 # FACILITY CATALOGUE: every service a local plan can hold (LUSPA Revised Zoning Guidelines 2025 + the study of the planner's
 # local plans, 2026-11-21). size = default site (ac); rule: how many the population needs (one = 1 above min_pop,
@@ -87,8 +87,8 @@ FACILITY_GROUPS = ['Education', 'Health', 'Commercial', 'Public space and recrea
 def _fc(id, group, name, use, luspa, size, rule='zero', per=0, min_pop=0, place='any', builtin=False, std=''):
     return dict(id=id, group=group, name=name, use=use, luspa=luspa, size=size, rule=rule, per=per, min_pop=min_pop, place=place, builtin=builtin, std=std)
 FACILITY_CATALOG = [
-    _fc('day_care', 'Education', 'Day Care / Nursery', 'Ed P', 'Ed P', 0.65, 'per', 3000, 600, 'market', True, 'KG 0.5 ac, 1,000-5,000 people; your plans 0.64-0.70 ac'),
-    _fc('basic_school', 'Education', 'Basic School (Primary + JHS) and Nursery', 'Ed P', 'Ed P', 3.0, 'per', 5000, 400, 'centre', True, 'primary 3 ac per 5,000; KG-JHS 6 ac; your plans 2.0-4.1 ac whole block'),
+    _fc('day_care', 'Education', 'Day Care / Nursery', 'Ed P', 'Ed P', 0.65, 'per', 3000, 600, 'market', True, 'KG 0.5 ac, 1,000-5,000 people; your plans 0.64-0.70 ac; Shama plans one or two plots (D.C.C) beside the market or school'),
+    _fc('basic_school', 'Education', 'Basic School (Primary + JHS) and Nursery', 'Ed P', 'Ed P', 3.0, 'per', 5000, 400, 'centre', True, 'primary 3 ac per 5,000; KG-JHS 6 ac; your plans 2.0-4.1 ac whole block; Shama plans 1.0-1.5 ac typical, 1 per 140-410 plots, central schools 3-11 ac'),
     _fc('primary', 'Education', 'Primary School', 'Ed P', 'Ed P', 3.0, 'zero', 5000, 0, 'centre', False, '3 ac; 1,500-6,000 people'),
     _fc('jhs', 'Education', 'Junior High School', 'Ed P', 'Ed P', 4.0, 'per', 10000, 7000, 'collector', False, '4 ac; 5,000-10,000 people'),
     _fc('shs', 'Education', 'Senior High School', 'Ed S', 'Ed S', 6.0, 'per', 20000, 10000, 'edge', False, 'min 6 ac (single stream); 10,000-20,000 people'),
@@ -105,22 +105,22 @@ FACILITY_CATALOG = [
     _fc('teaching_hospital', 'Health', 'Teaching / Specialised Hospital', 'HT', 'HT', 30.0, 'zero', 0, 0, 'main', False, 'min 30 ac; 300,000+ people'),
     _fc('corner_shop', 'Commercial', 'Corner Shop', 'Com A', 'Com', 0.25, 'per', 1650, 400, 'collector', True, 'shop min 0.25 ac, up to 500 people; your plans 1 per ~230 plots'),
     _fc('nbh_market', 'Commercial', 'Neighbourhood Shopping Centre / Market', 'Com A', 'Com', 1.0, 'per', 15000, 400, 'gateway', True, 'min 1 ac; 5,000-15,000 people; your plans ~1 ac per section'),
-    _fc('sub_market', 'Commercial', 'Sub-Market / Commercial', 'Com A', 'Com', 0.6, 'one', 0, 1500, 'collector', True, 'learned 0.23-1.58 ac'),
+    _fc('sub_market', 'Commercial', 'Sub-Market / Commercial', 'Com A', 'Com', 0.6, 'one', 0, 1500, 'collector', True, 'learned 0.23-1.58 ac; Shama plans commercial 0.7-1.8 ac, 1 per 40-190 plots'),
     _fc('local_market', 'Commercial', 'Local / Satellite Market', 'Com A', 'Com', 5.0, 'per', 30000, 15000, 'main', False, 'up to 10 ac + 20-50 % parking; up to 30,000 people'),
     _fc('large_market', 'Commercial', 'Large Commercial Market', 'Com A', 'Com', 7.4, 'zero', 0, 0, 'main', False, 'min 3 ha (7.4 ac); whole settlement'),
-    _fc('mixed_use', 'Commercial', 'Mixed use frontage (main road)', 'MU', 'BM', 0.0, 'one', 0, 0, 'main', True, 'commercial below, residential above, along major roads'),
+    _fc('mixed_use', 'Commercial', 'Mixed use frontage (main road)', 'MU', 'BM', 0.0, 'one', 0, 0, 'main', True, 'commercial below, residential above: the single row of plots along the main road / highway (West Essaman, Shama Extension Three, Beposo)'),
     _fc('fuel', 'Commercial', 'Fuel Station', 'Com A', 'Com', 0.75, 'one', 0, 1000, 'main', True, 'main road junction corner; 60 m school, 500 m clinic, 300 m next station, 30 m stream'),
     _fc('lpg', 'Commercial', 'LPG Refill Plant', 'Com A', 'Com', 0.75, 'zero', 0, 0, 'main', False, '500 m from public institutions and fuel stations'),
     _fc('postal', 'Commercial', 'Postal Agency', 'BM', 'BM', 0.16, 'one', 0, 400, 'market', True, 'min 400 m2; good access to the main road'),
     _fc('post_office', 'Commercial', 'General Post Office', 'CIV', 'CC', 2.0, 'per', 35000, 20000, 'centre', False, '1.2-4.9 ac; up to 35,000 people'),
     _fc('pos', 'Public space and recreation', 'P.O.S (park / open space)', 'POS', 'PS', 1.2, 'pos', 1000, 0, 'low', True, '1.2 ac per 1,000 people; within ~500 m of every home'),
-    _fc('kids_playground', 'Public space and recreation', "Children's Playground", 'POS', 'PS', 0.6, 'per', 2200, 1500, 'any', True, '0.5-1 ac in the neighbourhood cluster, within ~400 m of every home'),
+    _fc('kids_playground', 'Public space and recreation', "Children's Playground", 'POS', 'PS', 0.6, 'per', 2200, 1500, 'any', True, '0.5-1 ac in the neighbourhood cluster, within ~400 m of every home; Shama plans (C.P.G) 0.3-0.5 ac, many small ones spread through the plan'),
     _fc('sports_field', 'Public space and recreation', 'Sports Field / Football Park', 'POS', 'PS', 5.5, 'per', 5000, 4000, 'edge', False, 'local field sports: 1 ac per 1,000, min 5-6 ac per neighbourhood'),
     _fc('durbar', 'Public space and recreation', 'Durbar Ground', 'POS', 'PS', 1.5, 'per', 15000, 5000, 'centre', False, '0.5-2.5 ac; up to 15,000 people'),
     _fc('event_centre', 'Public space and recreation', 'Event Centre', 'CIV', 'CC', 0.5, 'zero', 0, 0, 'main', False, 'min 0.5 ac; up to 5,000 people'),
     _fc('cemetery', 'Public space and recreation', 'Cemetery', 'SU', 'SU', 2.0, 'per', 15000, 5000, 'away', False, '1.24-2.5 ac up to 5,000; 2.5-3.7 ac to 15,000; away from water and wells'),
     _fc('funeral_home', 'Public space and recreation', 'Funeral Home', 'SU', 'SU', 1.0, 'zero', 0, 0, 'away', False, 'min 1 ac; 300 m from houses'),
-    _fc('worship', 'Civic, security and emergency', 'Place of Worship', 'PW', 'PW', 0.75, 'per', 1500, 400, 'any', True, 'min 0.5 ac; your plans 0.5-0.8 ac, 1 per 1,000-2,500 people'),
+    _fc('worship', 'Civic, security and emergency', 'Place of Worship', 'PW', 'PW', 0.75, 'per', 1500, 400, 'any', True, 'min 0.5 ac; your plans 0.5-0.8 ac, 1 per 1,000-2,500 people; Shama plans civic sites ~1 ac (0.7-1.2), often on corners, paired with schools'),
     _fc('community_centre', 'Civic, security and emergency', 'Community Centre', 'CIV', 'CC', 0.8, 'one', 0, 400, 'market', True, 'learned civic 0.65-1.13 ac; beside the market or school'),
     _fc('chief_palace', 'Civic, security and emergency', "Chief's Palace / Traditional Council", 'CIV', 'CC', 1.0, 'zero', 0, 0, 'centre', False, 'keep where it stands'),
     _fc('gov_offices', 'Civic, security and emergency', 'Government Offices', 'CIV', 'BG', 2.0, 'per', 50000, 20000, 'main', False, 'government business zone'),
@@ -140,10 +140,12 @@ FACILITY_CATALOG = [
     _fc('utility_ut', 'Utilities and sanitation', 'Utility (U.T)', 'SU', 'SU', 0.2, 'per', 1500, 400, 'any', True, 'learned utility 0.13-0.36 ac'),
     _fc('substation', 'Utilities and sanitation', 'Electricity Substation', 'SU', 'SU', 0.5, 'per', 20000, 10000, 'edge', False, 'utility zone'),
     _fc('telecom_mast', 'Utilities and sanitation', 'Telecom Mast', 'SU', 'SU', 0.04, 'zero', 0, 0, 'edge', False, '12.5 x 12.5 m; 150 m from classrooms and wards'),
+    _fc('refuse_depot', 'Utilities and sanitation', 'Refuse Container Site (R.D)', 'SU', 'SU', 0.2, 'zero', 0, 0, 'low', False, 'Shama plans: small grey sites of one plot (0.15-0.3 ac), about 1 per 150 plots, on a road a truck can use'),
     _fc('refuse_transfer', 'Utilities and sanitation', 'Refuse Transfer Station', 'SU', 'SU', 5.0, 'per', 30000, 30000, 'away', False, 'min 5 ac; 30,000+ people'),
     _fc('sewage_treatment', 'Utilities and sanitation', 'Sewage Treatment Plant', 'SU', 'SU', 5.0, 'zero', 0, 0, 'away', False, 'min 5 ac; 500 m from houses'),
     _fc('water_treatment', 'Utilities and sanitation', 'Water Treatment Plant', 'SU', 'SU', 2.0, 'zero', 0, 0, 'away', False, '1 km from the nearest buildings'),
     _fc('recycling', 'Utilities and sanitation', 'Recycling Plant', 'SU', 'SU', 5.0, 'zero', 0, 0, 'away', False, 'min 5 ac; 500 m from houses'),
+    _fc('light_industrial', 'Industrial', 'Light Industrial Area (plots)', 'LI', 'LI', 5.0, 'zero', 0, 0, 'edge', False, 'Shama plans: a zone of large plots (0.6-1 ac, L.I 1-26) at the edge on the main road, kept apart from homes'),
     _fc('hotel', 'Tourism and heritage', 'Hotel', 'Com A', 'T', 1.0, 'zero', 0, 0, 'main', False, 'tourist zone'),
     _fc('guest_house', 'Tourism and heritage', 'Guest House', 'Com A', 'T', 0.3, 'zero', 0, 0, 'collector', False, 'your plans: guest houses beside schools and markets'),
     _fc('heritage', 'Tourism and heritage', 'Heritage Site', 'CIV', 'T', 1.0, 'zero', 0, 0, 'any', False, 'draw its outline'),
@@ -978,6 +980,60 @@ def obm_load(site, buffer_deg=0.0005, crs=2136):
     G['source'] = G.source_id.map(SOURCE).fillna('unknown'); G['use_obm'] = G.occupancy.map(OCC)
     return G.to_crs(crs).reset_index(drop=True)
 
+# ---- rivers database (user 2026-11-25) ----
+"""Rivers and streams of Africa: OpenStreetMap waterways (1,329,371 lines) from D:/Work/2026/Data/Rivers_ Africa/Rivers.shp, converted once
+to an R-tree indexed GeoPackage (layer 'rivers', EPSG:4326) so a site is read in about 0.02 s. Fields: osm_id, name, name_en, waterway
+(river / stream / canal / drain / ditch ...), intermittent, seasonal, tunnel, width. The site analysis checks it after the satellite image."""
+RIVERS_DB = f'{OBM_ROOT}/rivers_africa.gpkg'
+WATER_TYPES = ('river', 'stream', 'canal', 'drain', 'ditch')
+WATER_BUFFER_FT = {'river': 165, 'stream': 110, 'canal': 110, 'drain': 30, 'ditch': 15}   # default green reserve each side when the planner sets none
+def rivers_load(site, buffer_ft=1640, crs=2136):
+    """Watercourses of the rivers database within `buffer_ft` (default 500 m) of `site` (GeoSeries / GeoDataFrame, any CRS), in `crs`,
+    with dist_ft (to the site) and in_site_ft (length inside the site)."""
+    cols = ['osm_id', 'name', 'waterway', 'intermittent', 'seasonal', 'width']
+    empty = gpd.GeoDataFrame(columns=cols + ['dist_ft', 'in_site_ft', 'geometry'], geometry='geometry', crs=crs)
+    if not os.path.exists(RIVERS_DB): print(f'   rivers database not on disk ({RIVERS_DB})'); return empty
+    S = site.to_crs(crs).union_all()
+    w, s, e, n = gpd.GeoSeries([S.buffer(buffer_ft)], crs=crs).to_crs(4326).total_bounds
+    R = pyogrio.read_dataframe(RIVERS_DB, layer='rivers', bbox=(w, s, e, n), columns=cols)
+    if R.empty: return empty
+    R = R.to_crs(crs); R = R[R.waterway.isin(WATER_TYPES) & (R.distance(S) <= buffer_ft)].reset_index(drop=True)
+    if R.empty: return empty
+    R['dist_ft'] = R.distance(S).round(0); R['in_site_ft'] = R.intersection(S).length.round(0)
+    return R
+def river_check(ctx, S):
+    """Site analysis, after the satellite image: rivers / streams from the rivers database in or near the site (S, EPSG:2136).
+    Saves <P>Rivers_database.shp (map layer) and <P>Rivers_check.json (summary), and adds the ones OpenStreetMap did not
+    return to _work/osm_water.gpkg, so the automatic road design keeps them in a green reserve. Returns the summary."""
+    import pandas as pd
+    WORK, D, PFX = ctx['WORK'], ctx['D'], ctx['PFX']
+    R = rivers_load(gpd.GeoSeries([S], crs=2136))
+    shp = D + PFX + 'Rivers_database.shp'
+    for ext in ('.shp', '.shx', '.dbf', '.prj', '.cpg'):
+        if os.path.exists(shp[:-4] + ext): os.remove(shp[:-4] + ext)
+    if len(R): R.to_file(shp)
+    OW = gpd.read_file(WORK + 'osm_water.gpkg') if os.path.exists(WORK + 'osm_water.gpkg') else gpd.GeoDataFrame(columns=['waterway', 'name', 'geometry'], geometry='geometry', crs=2136)
+    if 'source' not in OW: OW['source'] = 'OpenStreetMap (live)'
+    OW = OW[OW.source != 'rivers database']                                   # a re-run replaces the earlier additions
+    if len(R):
+        have = OW.union_all().buffer(15) if len(OW) else None             # the same line already downloaded from OpenStreetMap
+        new = R if have is None else R[[g.difference(have).length > 0.2 * g.length for g in R.geometry]]
+        if len(new): OW = gpd.GeoDataFrame(pd.concat([OW, new[['waterway', 'name', 'geometry']].assign(source='rivers database')], ignore_index=True), geometry='geometry', crs=2136)
+        OW.to_file(WORK + 'osm_water.gpkg')
+    cross = R[R.in_site_ft > 0]
+    summ = dict(source=RIVERS_DB, near=int(len(R)), crossing=int(len(cross)), within_m=500,
+                types={k: int(v) for k, v in cross.waterway.value_counts().items()}, near_types={k: int(v) for k, v in R.waterway.value_counts().items()},
+                names=sorted({str(x) for x in R.name.dropna() if str(x).strip()}), length_in_site_m=round(float(cross.in_site_ft.sum()) * 0.3048),
+                nearest_m=(round(float(R.dist_ft.min()) * 0.3048) if len(R) else None),
+                intermittent=int((cross.intermittent.fillna('') == 'yes').sum() + (cross.seasonal.fillna('') == 'yes').sum()) if len(cross) else 0)
+    json.dump(summ, open(D + PFX + 'Rivers_check.json', 'w'), indent=1)
+    if not len(R): print('   rivers database: no river or stream within 500 m of the site')
+    else:
+        nm = f" ({', '.join(summ['names'][:4])})" if summ['names'] else ''
+        inside = f"{summ['crossing']} watercourse(s) cross the site {summ['types']}, {summ['length_in_site_m']} m inside" if summ['crossing'] else 'none crosses the site'
+        print(f"   rivers database: {inside}; {summ['near']} within 500 m{nm}, nearest {summ['nearest_m']} m. Compare with the satellite image: they are kept green in the road design.")
+    return R
+
 
 GUIDE = r"""# LP Toolkit: local plan preparation guide
 
@@ -1039,7 +1095,7 @@ Web app tools (ribbon tabs Project, Map, Edit, Design, Analysis, View):
 | Fit roads | After accepting a suitability site on a designed plan: the roads are adjusted slightly around it (section 7) |
 | 3D view | Terrain, land use (open spaces included) and buildings by height |
 
-**Site analysis comes first.** The `site` stage prepares the terrain before any road is drawn: Copernicus 30 m DEM, contours at an interval adapted to the relief (1, 2, 5, 10 m...), slope in percent, slope classes (flat 0-5%, gentle 5-10%, moderate 10-18%, steep 18-30%: no roads straight downhill, very steep > 30%: keep green) and the steep-slope reserve (slopes >= `--steep` %, default 30, pieces >= 0.5 ac kept green and excluded from blocks). Outputs: `<P>Contours.shp`, `<P>Slope_classes.shp`, `<P>Slope_percent.tif`, `<P>Steep_slope_reserve.shp`, `<P>Terrain_summary.json`, `<P>Site_analysis.png`, map overlays. In the web app: "Prepare site analysis", then review the terrain layers before planning roads.
+**Site analysis comes first.** The `site` stage prepares the terrain before any road is drawn: Copernicus 30 m DEM, contours at an interval adapted to the relief (1, 2, 5, 10 m...), slope in percent, slope classes (flat 0-5%, gentle 5-10%, moderate 10-18%, steep 18-30%: no roads straight downhill, very steep > 30%: keep green) and the steep-slope reserve (slopes >= `--steep` %, default 30, pieces >= 0.5 ac kept green and excluded from blocks). **Rivers check (2026-11-25):** after the satellite image is downloaded, the site is checked against the rivers database (all of Africa, OpenStreetMap waterways): every river, stream, canal, drain or ditch within 500 m is listed (how many cross the site, metres inside, names, nearest distance), drawn in blue with a white edge on both panels of `<P>Site_analysis.png` and saved as the map layer "Rivers and streams (database)" (dashed = seasonal / intermittent). Look at them on the image: the database can miss a small stream or carry an old channel. The ones the live OpenStreetMap download did not return are added to `_work/osm_water.gpkg`, so "Design the roads for me" keeps them in a green reserve: each side 165 ft (50 m) for a river, 110 ft for a stream or canal, 30 ft for a drain, 15 ft for a ditch, unless the planner sets the buffer. Outputs: `<P>Contours.shp`, `<P>Slope_classes.shp`, `<P>Slope_percent.tif`, `<P>Steep_slope_reserve.shp`, `<P>Rivers_database.shp`, `<P>Rivers_check.json`, `<P>Terrain_summary.json`, `<P>Site_analysis.png`, map overlays. In the web app: "Prepare site analysis", then review the terrain layers before planning roads.
 
 **Three road patterns** (`--pattern grid | curvilinear | ringband`; `--roads draft` drafts all three and compares them in `<P>Roads_patterns.png/.json`):
 - Grid iron: straight two-row blocks along the parcel's main road edge.
@@ -1058,6 +1114,7 @@ The automatic road layout (option 2) keeps existing roads on their alignment and
 | Satellite imagery (contextily, zoom 19): Google satellite by default (user choice 2026-11-17, Esri kept dropping connections), Esri World Imagery as the fallback (`--imagery esri` to prefer Esri) | Digitizing, checks, map backgrounds | 0.3 m/px at 5.5 N; 8 retries per tile, then a slow single-connection pass, then the other source. Google's terms allow its imagery only through official Google tools: fine for internal planning, use Esri or licensed imagery for published maps. The digitizing colour rules were calibrated on Esri (green cast): check the first Google runs against the building database |
 | **Building database** `D:/Work/2026/Data` | Footprints, occupancy, storey height | One GeoPackage per level-6 quadkey tile, layer `building`, EPSG:4326, ODbL. Tiles on disk: 033331, 033333 (Accra / south-east, 4.1 M buildings), 122220. Fields: id, occupancy (GEM taxonomy), height (`HBET:1-5` = 1 to 5 storeys), floorspace (rare), source_id (0 OSM, 1 Google Open Buildings, 2 Microsoft). Occupancy is good where OSM is rich (Osu 78% known), almost all UNK in indigenous cores (La). The `Ghana buildings.gdb` beside it is an empty ArcGIS project geodatabase |
 | OSM via Overpass | Roads (with names and class), POI tags, buildings | Overpass servers are often overloaded (502/504). The toolkit tries overpass-api.de, kumi, private.coffee, mail.ru, then falls back to the main OSM API `/api/0.6/map?bbox=` (works for sites up to about 0.25 sq deg / 50,000 nodes) |
+| **Rivers database** `D:/Work/2026/Data/rivers_africa.gpkg` | Rivers, streams, canals, drains and ditches in and near the site (site analysis, green reserve in the road design) | OpenStreetMap waterways for Africa, 1,329,371 lines, from `D:/Work/2026/Data/Rivers_ Africa/Rivers.shp` (1.1 GB, converted once to an R-tree indexed GeoPackage, layer `rivers`, EPSG:4326, about 0.02 s per site). Fields: osm_id, name, waterway, intermittent, seasonal, tunnel, width. Loader `rivers_load()`, check `river_check()` |
 | Microsoft Global ML Building Footprints | Reference footprints | `dataset-links.csv` + level-9 quadkey tile (Accra = 033333111); cached in `LP_Toolkit/cache/ms` |
 | Copernicus DEM 30 m (AWS) | Terrain, slope, drainage, facility siting | `https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N05_00_W001_00_DEM/...` (tile by integer lat/lon) |
 | STMA scheme study | Learned plot / block / road / facility statistics | `D:/Work/2026/Machine Learning/Results_STMA_Schemes/STMA_Scheme_Design_Rules.md` (section 7) |
@@ -1175,6 +1232,27 @@ Programme: LUSPA Manual 4.6.3 + the 2025 Guidelines mandatory list. Rates, site 
 | Children's playground | 0.5-1 ac | in the neighbourhood cluster, within about 400 m of every home |
 | S.A | 0.2-0.45 ac on a corner plot, on a road a refuse truck can use | every home within 500 m; 60 m from schools, day care, playgrounds, clinics; off the main road |
 | Police / fire | police 2.5-3 ac (LUSPA) | on the main road at the edge of the housing |
+
+**Second study: Shama District, Ahanta West and Prestea-Huni Valley plans (2026-11-25).** 64 plans in `All Scaned Maps Arranged/New LPs`: 10 recent Shama District local plans in colour (2022-2025: East Inchaban, Lower Inchaban 1 and 2, South Inchaban, Aboadze-Abuesi, Nyankrom-Aboadze-Abuesi, Shama Extension Three, West Essaman, Ohiamadwen, Nkyirkyir; plus Bedukrom and West Assorko as images), 40 Ahanta West planning schemes and 14 Prestea-Huni Valley schemes (scanned, black and white). About 50,000 plots measured: the vector plans shape by shape (scale checked on the 1,000 ft grid), the scans from the closed shapes between the drawn lines (scale from the sheet at 1:2,500, checked on the grid; sizes measured inside the lines, so a few feet under the true plot).
+
+| Group | Plots | Typical plot | Under 0.16 ac | Blocks |
+|---|---|---|---|---|
+| Ahanta West schemes (older) | 29,050 | 77 x 93 ft (6,600 sq ft); 70-85 x 85-95 | 62 % | two rows, rounded corners |
+| Prestea-Huni Valley schemes | 10,022 | 74 x 94 ft (6,500 sq ft) | 69 % | two rows, grid per sector |
+| Shama: Inchaban, Aboadze, Nyankrom (large) | 8,416 | 90-100 x 100-115 ft (10,000 sq ft) | 3-5 % | 205-230 ft deep, 300-410 ft long |
+| Shama: Extension Three, Ohiamadwen, Nkyirkyir, South Inchaban (medium) | 1,829 | 80-90 x 100-105 ft (8,000-8,700 sq ft) | 3-24 % | 200-210 ft deep, about 400 ft long |
+| Shama: West Essaman (compact, 2025) | 618 | 70-80 x 90 ft (6,600 sq ft) | 65 % | 180 ft deep, 345-475 ft long |
+
+What the new plans add:
+- **Plot size is a local choice.** Older schemes and the compact 2025 plan use about 70-80 x 90 ft; the peri-urban Shama plans use about 100 x 100-110 ft; most use one size per plan. The web app offers these as presets (Design the roads for me > Plot size from your plans), and the block depth follows (two plot depths) with a block length of whole plots (about 400-500 ft). The LUSPA Re B minimum (0.16 ac) still governs: the audit flags smaller plots.
+- **Blocks are short**: median 300-410 ft (4-6 plots a row), two rows deep; corners cut off (chamfered or rounded) in almost every plan.
+- **Roads**: two widths between blocks recur, about 20-30 ft (access) and 40-60 ft (local / distributor), with 75-100 ft main roads; West Essaman uses 30 and 40 ft roads with 20 ft lanes. Curvilinear networks follow the contours in the hilly plans (Lower Inchaban, Aboadze: 26-50 % irregular blocks); straight grids in the flat ones (West Essaman, Shama Extension Three: under 20 %).
+- **Mixed commercial-residential along the highway**: the single row of plots facing the main road is mixed use (West Essaman about 60 plots, Shama Extension Three). The toolkit now does the same when mixed use is in the programme.
+- **Kept as they are**: existing built-up villages (one "built-up area" parcel), cemeteries, poultry farms, wetlands and stream buffers, quarry buffers; high-tension lines run through a clear corridor without plots.
+- **Land-use budget (Shama plans)**: residential 61-78 % of the planned land (46-49 % where large parks or farms are kept), open space 3-14 % (24-41 % with a golf course or stream valley), commercial 3-6 % (11 % with mixed-use frontage), civic 2-6 %, education 1-6 %, utility and sanitary 0.2-1.3 %.
+- **Facilities (Shama plans)**: civic and worship sites about 1 ac (0.7-1.2), 1 per 60-120 plots, often on corners; commercial 0.7-1.8 ac, 1 per 40-190 plots (shopping centre, sub-market, hotel, bank, filling station, LPG station on the main roads); schools 1.0-1.5 ac, 1 per 140-410 plots, with central school blocks of 3-11 ac; utility and sanitary sites (S.A, refuse container R.D, U.T) 0.25-0.6 ac, 1 per 120-270 plots; many small children's playgrounds (C.P.G, 0.3-0.5 ac) and open spaces in leftover strips and along streams.
+- **Clusters**: school + market + S.A (West Essaman), worship + school (Shama Extension Three), police + fire + clinic and lorry park + market + playing ground in the centre (Nyankrom), school + church + bank + post office + fire station at the gateway (Aboadze-Abuesi). Light-industrial zones of large plots (0.6-1 ac) sit at the edge on the main road (Nyankrom, Shama Extension Three, Tai Oil village).
+- New optional catalogue items: Refuse Container Site (R.D) and Light Industrial Area.
 
 **Facility programme (web app "Facilities and services", after the site analysis).** Either the toolkit decides (the counts the population needs: `python lp_toolkit.py facilities --pop N` prints the catalogue of about 60 services, all levels, from LUSPA 2025 and the study) or the planner ticks each facility with its number, site size and, optionally, its location (a point or an outline). Saved as facilities.json (mode auto | custom, items {id: on, n, size_ac}, decisions) and facility_sites.geojson (fac_id); passed with `--facilities` / `--facility-sites`. Located sites are taken out of the blocks before subdivision. Learned facilities (school, playground, market, fuel, clinic, worship, day care, P.O.S, S.A, U.T, shops, police post, lorry park) keep their own placement rules with the planner's numbers and sizes; the others (SHS, hospitals, police station, cemetery, hotels, utilities ...) go to a leftover site of the right size by their siting preference. When a requested facility does not fit, the land-use stage writes shortfall.json and the run pauses: for each item the planner chooses Take the plots / Skip / Reduce the size, and the run continues from land use. In the toolkit's own programme it takes the plots by itself.
 
@@ -2248,8 +2326,10 @@ def st_design_autoroads(ctx):
     if stream is None and os.path.exists(WORK + 'osm_water.gpkg'):
         Wt = gpd.read_file(WORK + 'osm_water.gpkg')
         if len(Wt):
-            st_ = Wt.union_all().buffer(float(ctx.get('stream_buffer') or 110))
-            if st_.intersects(S): stream = st_; ctx['stream_poly'] = stream; stream_src = f'OpenStreetMap waterways ({len(Wt)})'
+            bf = float(ctx.get('stream_buffer') or 0)                    # the planner's buffer for every watercourse, else by type (rivers wider, roadside drains narrow)
+            st_ = unary_union([g.buffer(bf or WATER_BUFFER_FT.get(str(t_), 110)) for g, t_ in zip(Wt.geometry, Wt.waterway if 'waterway' in Wt else [None] * len(Wt))])
+            ndb = int((Wt.source == 'rivers database').sum()) if 'source' in Wt else 0
+            if st_.intersects(S): stream = st_; ctx['stream_poly'] = stream; stream_src = f'OpenStreetMap waterways ({len(Wt) - ndb})' + (f' + rivers database ({ndb})' if ndb else '')
     STP = steep_reserve(ctx)
     if STP is not None: stream_src = (stream_src + ' + ' if stream is not None else '') + 'steep slopes'; stream = STP if stream is None else stream.union(STP); print(f'   steep-slope reserve kept green: {STP.area / 43560:.1f} ac')
     terrain = _Terrain(WORK + 'dem_2136.tif') if os.path.exists(WORK + 'dem_2136.tif') else None
@@ -3813,6 +3893,9 @@ def _design_site_analysis(ctx):
     for b in range(3):
         reproject(img[:, :, b], out[b], src_transform=src_t, src_crs='EPSG:3857', dst_transform=dst_t, dst_crs='EPSG:2136', resampling=Resampling.bilinear)
     with rasterio.open(OUT + 'imagery_2136.tif', 'w', driver='GTiff', height=H, width=W, count=3, dtype='uint8', crs='EPSG:2136', transform=dst_t) as d: d.write(out)
+    # ---- after the satellite image: rivers and streams from the rivers database (drawn on both maps) ----
+    try: RIV = river_check(ctx, S)
+    except Exception as ex: print('   rivers database check failed:', str(ex)[:120]); RIV = None
     # ---- DEM to 2136 at 10 ft ----
     with rasterio.open(OUT + 'dem.tif') as r:
         t2, W2, H2 = calculate_default_transform(r.crs, 'EPSG:2136', r.width, r.height, *r.bounds, resolution=10)
@@ -3841,10 +3924,15 @@ def _design_site_analysis(ctx):
         cs = ax.contour(X, Y, dem, levels=np.arange(np.floor(np.nanmin(dem) / CI) * CI, np.nanmax(dem) + CI, CI), colors='cyan' if mode == 'img' else 'k', linewidths=.6)
         ax.clabel(cs, cs.levels[::2], fontsize=7, fmt='%d m')
         site.boundary.plot(ax=ax, color='yellow' if mode == 'img' else 'b', lw=2.5)
+        if RIV is not None and len(RIV):                                  # on top of the contours, white edge so they read on the image
+            import matplotlib.patheffects as pe
+            lw_ = [3.6 if t_ == 'river' else 2.6 if t_ in ('stream', 'canal') else 1.8 for t_ in RIV.waterway]
+            RIV.plot(ax=ax, color='#0047FF', lw=lw_, zorder=6, path_effects=[pe.Stroke(linewidth=max(lw_) + 2.2, foreground='white'), pe.Normal()])
         ax.set_xlim(x0, x1); ax.set_ylim(y0, y1); ax.set_aspect('equal')
         ax.set_xticks(np.arange(round(x0, -2), x1, 200)); ax.set_yticks(np.arange(round(y0, -2), y1, 200))
         ax.tick_params(axis='x', rotation=90, labelsize=7); ax.tick_params(axis='y', labelsize=7); ax.grid(color='w' if mode == 'img' else 'grey', lw=.3)
-    axs[0].set_title(f'Imagery (Esri, Maxar, Earthstar Geographics) + {CI} m contours, EPSG:2136 ft'); axs[1].set_title('Slope and contours')
+    rv = f' | blue = rivers / streams (database, {len(RIV)} within 500 m)' if RIV is not None and len(RIV) else ''
+    axs[0].set_title(f'Imagery + {CI} m contours{rv}, EPSG:2136 ft'); axs[1].set_title('Slope and contours' + rv)
     plt.savefig(OUT + 'site_analysis.png', bbox_inches='tight', dpi=80)
 
 def st_design_subdivide(ctx):
@@ -4835,9 +4923,14 @@ def st_design_landuse(ctx):
     log.append(('Corner Shop', f'{n_sh} corner site(s) on the collector', 'learned 1 per ~230 plots; at least 0.25 ac (two plots where one is smaller)'))
     log.append(('Open space total', f'{pos_area():.2f} ac', f'LUSPA about 1.2 ac per 1,000 people = {POS_TARGET:.1f} ac for ~{nres0 * 7.2:.0f} people'))
     # ---------- 10. deep frontage plots on the 60 ft main road / 100 ft corridor (> 140 ft deep) -> mixed use (commercial below, residential above) ----------
-    mu = [i for i in P.index[P.use == 'RE'] if fq('mixed_use', 1) > 0 and mrr(P.geometry[i])[1] > 140 and (P.geometry[i].distance(MAIN) < 3 or P.geometry[i].distance(CORR) < 3)]
+    def fronts_main(g):                                                  # the plot's road side runs along the main road (not just a corner touching it)
+        for R_ in (MAIN, CORR):
+            if R_ is None or R_.is_empty or g.distance(R_) > 3: continue
+            if g.boundary.intersection(R_.buffer(3)).length > 0.5 * mrr(g)[0]: return True
+        return False
+    mu = [i for i in P.index[P.use == 'RE'] if fq('mixed_use', 1) > 0 and fronts_main(P.geometry[i])]
     P.loc[mu, 'use'] = 'MU'; P.loc[mu, 'label'] = ''
-    log.append(('Mixed use frontage plots', f'{len(mu)} plots', 'deep plots on the major roads; Guidelines: mixed use / commercial along major roads'))
+    log.append(('Mixed use frontage plots', f'{len(mu)} plots', 'the single row of plots facing the main road (Shama District plans: West Essaman, Shama Extension Three; Beposo); Guidelines: mixed use / commercial along major roads'))
     # ---------- plots with roads front and back: never turned into commercial the planner did not ask for (user 2026-11-21) ----------
     # two plots back to back where each half is a usable plot (local plans: two rows per block); otherwise kept residential and flagged by the audit
     nsp, nkeep, njoin, NEWD = 0, 0, 0, []
@@ -4970,7 +5063,7 @@ def st_design_landuse(ctx):
         print('   The run stops here so you can choose for each: take plots / skip / reduce the size (Run tab), then continue from land use.', flush=True)
         ctx['stop'] = True
     elif os.path.exists(sf_): os.remove(sf_)
-    COL = {'RA': '#c96a1a', 'MU': '#b5651d', 'CIV': '#c19bd8', 'TR': '#9a9a9a', 'RE': '#DC7C24', 'BM': '#73B2FF', 'Com A': '#73B2FF', 'PW': '#FF7F7F', 'H Po': '#FF0000', 'Ed P': '#FFFF00', 'POS': '#00FF00', 'SU': '#a0522d', 'GRN': '#b8f0b8'}
+    COL = {'RA': '#c96a1a', 'MU': '#b5651d', 'CIV': '#c19bd8', 'TR': '#9a9a9a', 'RE': '#DC7C24', 'BM': '#73B2FF', 'Com A': '#73B2FF', 'PW': '#FF7F7F', 'H Po': '#FF0000', 'Ed P': '#FFFF00', 'POS': '#00FF00', 'SU': '#a0522d', 'GRN': '#b8f0b8', 'LI': '#E8BEFF'}
     r = rasterio.open(OUT + 'imagery_2136.tif'); a = np.moveaxis(r.read(), 0, -1); bb = r.bounds
     fig, ax = plt.subplots(figsize=(15, 14)); ax.imshow(a, extent=(bb.left, bb.right, bb.bottom, bb.top), alpha=.35)
     gpd.GeoSeries([SR]).plot(ax=ax, color='#2e8b57', alpha=.8)

@@ -11,7 +11,7 @@ const Sketch = (() => {
   const opt = o => Object.assign({ interactive: false, renderer: R_, pane: 'proSketch' }, o);
   let S = null;                                                           // the active sketch
   // ---------------------------------------------------------------- geometry to snap to (what is drawn in view)
-  const NOSNAP = ['contours', 'slope', 'steep', 'audit', 'raster', 'hillshade'];
+  const NOSNAP = ['contours', 'slope', 'steep', 'water', 'audit', 'raster', 'hillshade'];
   function collect(roadsOnly) {                                          // roadsOnly: a road sketch snaps to roads, the site and streams (not plot corners)
     const out = [], vb = map.getBounds().pad(0.3), add = (lyr, closed) => {
       if (!lyr.getLatLngs || (lyr.getBounds && !vb.intersects(lyr.getBounds()))) return;

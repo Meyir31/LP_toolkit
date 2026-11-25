@@ -357,6 +357,18 @@ $('#redesignBtn').onclick = async () => {
 };
 const SLOPE_COL = { 'Flat': '#1a9850', 'Gentle': '#91cf60', 'Moderate': '#fee08b', 'Steep': '#fc8d59', 'Very steep': '#d73027' };
 const slopeCol = c => SLOPE_COL[Object.keys(SLOPE_COL).find(k => (c || '').startsWith(k))] || '#ccc';
+// rivers database check (site analysis, user 2026-11-25): what crosses the site and what is near it
+const RIV_T = { river: 'river', stream: 'stream', canal: 'canal', drain: 'drain', ditch: 'ditch' };
+function riversRow(v) {
+  if (!v) return '';
+  if (!v.near) return `<tr><td colspan="2"><span class="swatch" style="background:#1E90FF"></span>Rivers database: no river or stream within 500 m</td></tr>`;
+  const ty = o => Object.entries(o || {}).map(([k, n]) => `${n} ${RIV_T[k] || k}${n > 1 ? 's' : ''}`).join(', ');
+  const e_ = t => String(t ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const nm = (v.names || []).length ? ` (${v.names.slice(0, 4).map(e_).join(', ')})` : '';
+  return `<tr><td colspan="2"><span class="swatch" style="background:#1E90FF"></span><b>Rivers database:</b> ` +
+    (v.crossing ? `${ty(v.types)} ${v.crossing === 1 ? 'crosses' : 'cross'} the site, ${v.length_in_site_m} m inside` : `none crosses the site, nearest ${v.nearest_m} m away`) +
+    `; ${v.near} within 500 m${nm}. Check them on the satellite image; the road design keeps them in a green reserve.</td></tr>`;
+}
 async function loadTerrain() {
   if (!P || P.workflow !== 'design') return;
   const t = await api(`/api/projects/${P.id}/terrain`);
@@ -364,11 +376,11 @@ async function loadTerrain() {
   $('#terrState').textContent = 'done';
   $('#terrSum').innerHTML = `<table class="mini"><tr><th colspan="2">Elevation ${t.elev_min}-${t.elev_max} m (relief ${t.relief} m), contours every ${t.contour_interval} m, mean slope ${t.mean_slope_pct}%</th></tr>` +
     t.classes.map(c => `<tr><td><span class="swatch" style="background:${slopeCol(c.cls)}"></span>${c.cls}</td><td>${c.area_ac} ac (${c.share}%)</td></tr>`).join('') +
-    (t.steep_pct > 0 ? `<tr><td><b>Kept green (slopes >= ${t.steep_pct}%)</b></td><td><b>${t.steep_reserve_ac} ac</b></td></tr>` : '') + '</table>';
+    (t.steep_pct > 0 ? `<tr><td><b>Kept green (slopes >= ${t.steep_pct}%)</b></td><td><b>${t.steep_reserve_ac} ac</b></td></tr>` : '') + riversRow(t.rivers) + '</table>';
   const r = await api(`/api/projects/${P.id}/layers`); $('#terrLayers').innerHTML = '';
-  for (const L_ of r.layers.filter(l => ['raster', 'slope', 'contours', 'steep'].includes(l.kind))) {
+  for (const L_ of r.layers.filter(l => ['raster', 'slope', 'contours', 'steep', 'water'].includes(l.kind))) {
     const lab = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox';
-    cb.checked = !!(results[L_.path] && resGroup.hasLayer(results[L_.path])) || L_.label === 'Contours';
+    cb.checked = !!(results[L_.path] && resGroup.hasLayer(results[L_.path])) || L_.label === 'Contours' || L_.kind === 'water';
     cb.onchange = () => toggleLayer(L_, cb.checked); $('#terrLayers').append(layerRow(L_, lab, cb)); if (cb.checked) toggleLayer(L_, true);
   }
 }
@@ -454,6 +466,7 @@ function styleFor(kind) {
       case 'slope': return { color: '#555', weight: .3, fillColor: slopeCol(p.cls), fillOpacity: .55 };
       case 'contours': return { color: '#6d4c41', weight: (p.major === true || p.major === 1 || p.major === 'True') ? 1.6 : .6, opacity: .9 };
       case 'steep': return { color: '#b71c1c', weight: 1, fillColor: '#2e7d32', fillOpacity: .45, dashArray: '4 3' };
+      case 'water': return { color: '#1E90FF', weight: p.waterway === 'river' ? 4 : ['stream', 'canal'].includes(p.waterway) ? 3 : 1.5, opacity: .95, dashArray: (p.intermitte === 'yes' || p.seasonal === 'yes') ? '6 4' : null };
       case 'draft': return { color: p.kind === 'existing' ? '#111' : p.kind === 'collector' ? '#f5a142' : '#1f5fd1', weight: p.kind === 'local' ? 2 : 4 };
       default: return { color: '#333', weight: 1 };
     }
@@ -479,7 +492,7 @@ async function loadResults(fresh) {
   LAYER_INDEX = r.layers;
   const DEFAULT_ON = new Set(['plots', 'plots_design', 'reserves', 'roads', 'lines']);
   const GROUPS = [['Land use and plots', ['plots', 'plots_design', 'blocks', 'reserves']], ['Roads', ['roads', 'lines', 'points']], ['Buildings', ['buildings', 'walls']],
-                  ['Terrain and environment', ['raster', 'slope', 'contours', 'steep', 'green']], ['Checks', ['audit']]];
+                  ['Terrain and environment', ['raster', 'slope', 'contours', 'steep', 'water', 'green']], ['Checks', ['audit']]];
   const grpOf = k => (GROUPS.find(([, ks]) => ks.includes(k)) || ['Other'])[0];
   const order = [...GROUPS.map(g => g[0]), 'Other'];
   const list = r.layers.filter(l => l.kind !== 'draft').map((l, i) => ({ l, i })).sort((a, b) => order.indexOf(grpOf(a.l.kind)) - order.indexOf(grpOf(b.l.kind)) || a.i - b.i).map(x => x.l);
@@ -605,6 +618,7 @@ function rebuildLegend() {
   if (kinds.has('slope')) ter += `<div class="lsub">Slope</div>` + Object.entries(SLOPE_COL).map(([k, c]) => legItem(`background:${c}`, k)).join('');
   if (kinds.has('steep')) ter += legItem('background:#d73027;opacity:.5', 'Steep-slope reserve (kept green)');
   if (kinds.has('contours')) ter += legItem('border:0;border-top:2px solid #8d6e63;height:0;margin-top:6px', 'Contours');
+  if (kinds.has('water')) ter += legItem('border:0;border-top:3px solid #1E90FF;height:0;margin-top:6px', 'Rivers / streams (database; dashed = seasonal)');
   parts.push(sec('Terrain', ter, false));
   // roads
   let rd = '';

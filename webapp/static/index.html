@@ -83,7 +83,7 @@
           </div>
           <div class="card" id="facCard" hidden>
             <div class="cardh">Facilities and services <span id="facState" class="mini"></span></div>
-            <p class="hint">After the site analysis: decide which facilities and services the local plan holds. Let the toolkit work out what the population needs (LUSPA 2025 standards and the sizes from your local plans), or tick them yourself with the number, the site size and, if you wish, the location (a point, where a site of that size is shaped, or the exact outline). Located sites are kept clear when the roads are designed. River buffers are set under Stream / drainage.</p>
+            <p class="hint">After the site analysis: decide which facilities and services the local plan holds. Let the toolkit work out what the population needs (LUSPA 2025 standards and the sizes from your local plans), or tick them yourself with the number, the site size and, if you wish, the location (a point, where a site of that size is shaped, or the exact outline). When the roads are designed, each located site is fitted into the road blocks where you put it (corner shops and S.A on a corner plot). River buffers are set under Stream / drainage.</p>
             <div class="seg" id="facMode"><button data-m="auto">Let the toolkit decide</button><button data-m="custom">I will choose</button></div>
             <div class="row"><span class="mini">Planned population</span><input id="facPop" type="number" min="0" step="100" style="width:100px"><span class="mini" id="facPopHint"></span></div>
             <div class="row"><input id="facSearch" placeholder="Search facilities (e.g. school, hospital, fuel)" style="flex:1"><label class="tl mini"><input type="checkbox" id="facOnly"> ticked only</label><button id="facRec" class="ghost" title="Reset the numbers and sizes to what the population needs">Recommended numbers</button></div>
@@ -111,7 +111,8 @@
               <div class="cardh">Design the roads for me</div>
               <div class="grid2">
                 <span class="mini">Pattern</span><select id="dPattern"><option value="mixed">Blended (best pattern per parcel)</option><option value="grid">Grid iron</option><option value="curvilinear">Curvilinear (follows the contours)</option></select>
-                <span class="mini">Block depth</span><select id="dBand"><option value="200">200 ft (2 x 100 ft plots)</option><option value="240">240 ft (2 x 120 ft plots)</option></select>
+                <span class="mini">Plot size from your plans</span><select id="dPreset" title="Plot sizes measured on the local plans studied (sets plot size, block depth and block length)"><option value="">Standard: 70 x 100 ft (LUSPA Re B)</option><option value="70x90">Compact: 70 x 90 ft (West Essaman, Aboadi Baako-Ntsena, Wassa Mampong)</option><option value="80x100">Medium: 80 x 100 ft (Shama Extension Three, Ohiamadwen, Nkyirkyir)</option><option value="100x110">Large: 100 x 110 ft (Inchaban, Aboadze-Abuesi)</option></select>
+                <span class="mini">Block depth</span><select id="dBand"><option value="180">180 ft (2 x 90 ft plots)</option><option value="200" selected>200 ft (2 x 100 ft plots)</option><option value="220">220 ft (2 x 110 ft plots)</option><option value="240">240 ft (2 x 120 ft plots)</option></select>
                 <span class="mini">Block length</span><select id="dLen"><option value="420">420 ft (6 x 70)</option><option value="490" selected>490 ft (7 x 70)</option><option value="560">560 ft (8 x 70)</option></select>
                 <span class="mini">Plot size (ft)</span><span class="psz"><input id="dPW" type="number" min="30" max="400" step="1" placeholder="70" title="Plot breadth (frontage), ft"> x <input id="dPL" type="number" min="30" max="600" step="1" placeholder="100" title="Plot length (depth), ft"></span>
                 <span class="mini">Local roads</span><select id="dLocal"><option>24</option><option selected>30</option><option>40</option></select>
@@ -228,5 +229,6 @@
 <script src="/static/mapnav.js"></script>
 <script src="/static/suitability.js"></script>
 <script src="/static/about.js"></script>
+<script src="/static/presets.js"></script>
 </body>
 </html>

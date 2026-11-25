@@ -59,7 +59,7 @@
   }
   const roadsG = [...rib.querySelectorAll(':scope > .grp')].find(x => x.dataset.rt === 'design' && /Roads/.test(x.querySelector('.gl')?.textContent || ''));
   if (roadsG) {
-    roadsG.querySelector('.gb').insertAdjacentHTML('beforeend', `<button data-x="fitroads" title="Design the roads again around the located facilities (exact outlines), keep your own roads, then remake the plan">${ic('<rect x="8" y="8" width="8" height="8" fill="#F3E5F5" stroke="#6a1b9a" stroke-dasharray="2 1.5"/><path d="M3 5h18M3 19h18M5 3v18M19 3v18" stroke="#8d8d8d" stroke-width="1.8"/>')}<span>Fit roads</span></button>`);
+    roadsG.querySelector('.gb').insertAdjacentHTML('beforeend', `<button data-x="fitroads" title="Adjust the roads slightly around the facilities you accepted (trim, edge roads, reconnect); your own and existing roads never move; only the blocks touched are re-plotted">${ic('<rect x="8" y="8" width="8" height="8" fill="#F3E5F5" stroke="#6a1b9a" stroke-dasharray="2 1.5"/><path d="M3 5h18M3 19h18M5 3v18M19 3v18" stroke="#8d8d8d" stroke-width="1.8"/>')}<span>Fit roads</span></button>`);
     roadsG.querySelector('[data-x=fitroads]').onclick = e => { e.stopPropagation(); window.fitRoadsToFacilities && fitRoadsToFacilities(); };
   }
   const lc = document.querySelector('.lblctl');

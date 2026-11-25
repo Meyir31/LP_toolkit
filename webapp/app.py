@@ -149,8 +149,10 @@ def get_input(pid, kind):
     return send_file(f, mimetype='application/json')
 @app.get('/api/projects/<pid>/terrain')
 def terrain(pid):
-    f = os.path.join(outdir(pid), prefix(pid) + 'Terrain_summary.json')
-    return jsonify(json.load(open(f)) if os.path.exists(f) else {})
+    f = os.path.join(outdir(pid), prefix(pid) + 'Terrain_summary.json'); t = json.load(open(f)) if os.path.exists(f) else {}
+    rv = os.path.join(outdir(pid), prefix(pid) + 'Rivers_check.json')                 # rivers database check (site analysis)
+    if t and os.path.exists(rv): t['rivers'] = json.load(open(rv))
+    return jsonify(t)
 @app.get('/api/projects/<pid>/patterns')
 def patterns(pid):
     f = os.path.join(outdir(pid), prefix(pid) + 'Roads_patterns.json')
@@ -373,7 +375,7 @@ EDITABLE = {
                  ('Vacant / open land', '{O}/{P}Vacant_open_land.shp'), ('Tree belt', '{O}/{P}Tree_belt_existing.shp'), ('Pinch points', '{O}/{P}Road_pinch_points.shp'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson')],
     'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'), ('Plots (before land use)', '{O}/_work/plots_final.gpkg'),
                ('Road reserves', '{O}/_work/layout_roads.gpkg'), ('Road centrelines (design)', '{O}/_work/layout_centrelines.gpkg'),
-               ('Slope classes', '{O}/{P}Slope_classes.shp'), ('Contours', '{O}/{P}Contours.shp'), ('Steep-slope reserve', '{O}/{P}Steep_slope_reserve.shp'),
+               ('Slope classes', '{O}/{P}Slope_classes.shp'), ('Contours', '{O}/{P}Contours.shp'), ('Steep-slope reserve', '{O}/{P}Steep_slope_reserve.shp'), ('Rivers and streams (database)', '{O}/{P}Rivers_database.shp'),
                ('Blocks', '{O}/_work/layout_blocks.gpkg'), ('Existing buildings', '{O}/_work/buildings.gpkg'), ('Existing roads to keep', 'existing.geojson'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson'), ('Redesign / zone areas', 'zones.geojson')],
 }
 READONLY = {'area_m2', 'frontage_m', 'depth_m', 'coverage', 'n_bld', 'main_bld', 'length_m', 'area_ac', '_fid'}
@@ -863,6 +865,7 @@ LAYERS = {   # (label, relative path template, kind)
     'design': [('Elevation (hillshade)', '{O}/{P}Elevation_overlay.png', 'raster'), ('Slope', '{O}/{P}Slope_overlay.png', 'raster'),
                ('Slope classes', '{O}/{P}Slope_classes.shp', 'slope'), ('Contours', '{O}/{P}Contours.shp', 'contours'),
                ('Steep-slope reserve (kept green)', '{O}/{P}Steep_slope_reserve.shp', 'steep'),
+               ('Rivers and streams (database)', '{O}/{P}Rivers_database.shp', 'water'),
                ('Road draft: grid iron', '{O}/{P}Roads_draft_grid.shp', 'draft'), ('Road draft: curvilinear', '{O}/{P}Roads_draft_curvilinear.shp', 'draft'),
                ('Plots and land use', '{O}/_work/plots_landuse.gpkg', 'plots_design'),
                ('Plots (before land use)', '{O}/_work/plots_final.gpkg', 'blocks'), ('Road reserves', '{O}/_work/layout_roads.gpkg', 'roads'), ('Road centrelines (design)', '{O}/_work/layout_centrelines.gpkg', 'lines'),
