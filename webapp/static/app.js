@@ -369,7 +369,21 @@ function riversRow(v) {
     (v.crossing ? `${ty(v.types)} ${v.crossing === 1 ? 'crosses' : 'cross'} the site, ${v.length_in_site_m} m inside` : `none crosses the site, nearest ${v.nearest_m} m away`) +
     `; ${v.near} within 500 m${nm}. Check them on the satellite image; the road design keeps them in a green reserve.</td></tr>`;
 }
+// cadastral drawing check (existing plots, user 2026-11-25)
+async function loadCadastre() {
+  const box = $('#cadCard'); if (!box) return;
+  let c = {}; try { c = P && P.workflow === 'existing' ? await api(`/api/projects/${P.id}/cadastre`) : {}; } catch { c = {}; }
+  if (!c.plots) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!c.covered) { $('#cadSum').innerHTML = 'This site is outside the cadastral drawing (Greater Accra survey plots): the plots come from the image, buildings and walls only.'; return; }
+  const sh = c.shift_ft && (c.shift_ft[0] || c.shift_ft[1]) ? ` The drawing was moved ${c.shift_ft[0]} ft east and ${c.shift_ft[1]} ft north to sit on the roads seen on the image.` : '';
+  $('#cadSum').innerHTML = `<b>${c.drawing_plots_in_site}</b> surveyed plots cover ${c.drawing_cover_pct}% of the site; the plot lines follow them where they are close.${sh}<br>` +
+    `<span class="swatch" style="background:#2ecc71"></span>${c.matches} plots match the drawing &nbsp; <span class="swatch" style="background:#f39c12"></span>${c.differs} differ &nbsp; <span class="swatch" style="background:#95a5a6"></span>${c.not_in_drawing} not in it<br>` +
+    `<span class="swatch" style="background:#e53935"></span><b>${c.buildings_crossed}</b> buildings are crossed by a surveyed plot line (${c.plots_flagged} plots flagged): the surveyed line is kept, check them on the ground. ` +
+    `Each plot's popup shows <i>cad_match</i>, <i>cad_iou</i> and <i>cad_flag</i>.`;
+}
 async function loadTerrain() {
+  loadCadastre();
   if (!P || P.workflow !== 'design') return;
   const t = await api(`/api/projects/${P.id}/terrain`);
   if (!t.relief) { $('#terrSum').innerHTML = ''; $('#terrState').textContent = 'not done yet'; $('#terrLayers').innerHTML = ''; return; }
@@ -465,6 +479,8 @@ function styleFor(kind) {
       case 'green': return { color: '#1b5e20', weight: 1, fillColor: LUSPA.CA[1], fillOpacity: .7 };
       case 'slope': return { color: '#555', weight: .3, fillColor: slopeCol(p.cls), fillOpacity: .55 };
       case 'contours': return { color: '#6d4c41', weight: (p.major === true || p.major === 1 || p.major === 'True') ? 1.6 : .6, opacity: .9 };
+      case 'cadastre': return { color: '#d50000', weight: 1.2, fill: false, dashArray: '5 3' };
+      case 'cadconf': return { color: '#e53935', weight: 1.5, fillColor: '#e53935', fillOpacity: .25 };
       case 'steep': return { color: '#b71c1c', weight: 1, fillColor: '#2e7d32', fillOpacity: .45, dashArray: '4 3' };
       case 'water': return { color: '#1E90FF', weight: p.waterway === 'river' ? 4 : ['stream', 'canal'].includes(p.waterway) ? 3 : 1.5, opacity: .95, dashArray: (p.intermitte === 'yes' || p.seasonal === 'yes') ? '6 4' : null };
       case 'draft': return { color: p.kind === 'existing' ? '#111' : p.kind === 'collector' ? '#f5a142' : '#1f5fd1', weight: p.kind === 'local' ? 2 : 4 };
@@ -491,7 +507,7 @@ async function loadResults(fresh) {
   let r; try { r = await api(`/api/projects/${P.id}/layers`); } catch { return; }
   LAYER_INDEX = r.layers;
   const DEFAULT_ON = new Set(['plots', 'plots_design', 'reserves', 'roads', 'lines']);
-  const GROUPS = [['Land use and plots', ['plots', 'plots_design', 'blocks', 'reserves']], ['Roads', ['roads', 'lines', 'points']], ['Buildings', ['buildings', 'walls']],
+  const GROUPS = [['Land use and plots', ['plots', 'plots_design', 'blocks', 'reserves', 'cadastre']], ['Roads', ['roads', 'lines', 'points']], ['Buildings', ['buildings', 'walls', 'cadconf']],
                   ['Terrain and environment', ['raster', 'slope', 'contours', 'steep', 'water', 'green']], ['Checks', ['audit']]];
   const grpOf = k => (GROUPS.find(([, ks]) => ks.includes(k)) || ['Other'])[0];
   const order = [...GROUPS.map(g => g[0]), 'Other'];
@@ -633,6 +649,8 @@ function rebuildLegend() {
   if (inputs.site.getLayers().length) ft += legItem('border:2px solid #ff3b30;background:none', 'Site boundary');
   if (kinds.has('blocks')) ft += legItem('border:1.5px solid #000;background:none', 'Blocks');
   if (kinds.has('buildings')) ft += legItem('border:1px solid #1f5fd1;background:none', 'Buildings');
+  if (kinds.has('cadastre')) ft += legItem('border:1.5px dashed #d50000;background:none', 'Cadastral plots (survey drawing)');
+  if (kinds.has('cadconf')) ft += legItem('background:#e53935;opacity:.6', 'Building crossed by a surveyed plot line');
   if (kinds.has('walls')) ft += legItem('border:0;border-top:2px solid #e91e63;height:0;margin-top:6px', 'Walls / fences');
   if (kinds.has('green')) ft += legItem(`background:${LUSPA.CA[1]}`, 'Tree belt / vacant land');
   if (inputs.stream.getLayers().length) ft += legItem('background:#2e8b57;opacity:.6', 'Streams / water');

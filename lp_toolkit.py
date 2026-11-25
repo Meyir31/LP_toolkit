@@ -1034,6 +1034,149 @@ def river_check(ctx, S):
         print(f"   rivers database: {inside}; {summ['near']} within 500 m{nm}, nearest {summ['nearest_m']} m. Compare with the satellite image: they are kept green in the road design.")
     return R
 
+# ---- cadastral plots database (user 2026-11-25) ----
+"""Surveyed plot demarcations of Greater Accra from D:/Work/2026/Data/COLLESUA NEW 1/COLLESUA NEW 1.dwg (AutoCAD 2007, no CRS stored;
+coordinates are Ghana National Grid feet = EPSG:2136, checked against the building database: within about 10 ft). Exported with ArcGIS Pro,
+plot lines of layers 0LOT, 0LOT1, 0DIST01-04, 0FOB, 0FOBIL, 0SEC204, 0CHRIS (all plot boundaries, user 2026-11-25) noded and polygonised,
+duplicates across layers dropped -> D:/Work/2026/Data/cadastre_accra.gpkg: 'parcels' (181,934; parcel_id, layer, area_ac, front_ft, depth_ft),
+'lines' (651,316 boundary pieces), 'labels' (section / place names, survey numbers). Used by the EXISTING workflow only (not the design):
+the plot stage pulls its cuts onto the drawing's lines, keeps a drawing line even where it crosses a building (flagged), and compares every plot."""
+CADASTRE_DB = f'{OBM_ROOT}/cadastre_accra.gpkg'
+CAD_SNAP_FT = 4.0        # a candidate plot line within this distance of a parallel drawing line is pulled onto it
+CAD_BONUS = 3.0          # per foot of drawing line followed; larger than the building cut cost (1 per foot), so the drawing wins over buildings
+def cadastre_load(S, buffer_ft=150):
+    """(parcels, lines) of the cadastral database around site polygon S (EPSG:2136); empty frames when not covered."""
+    import pyogrio
+    e = gpd.GeoDataFrame(columns=['parcel_id', 'layer', 'area_ac', 'geometry'], geometry='geometry', crs=2136)
+    if not os.path.exists(CADASTRE_DB): return e, gpd.GeoDataFrame(columns=['layer', 'geometry'], geometry='geometry', crs=2136)
+    bb = S.buffer(buffer_ft).bounds
+    P = pyogrio.read_dataframe(CADASTRE_DB, layer='parcels', bbox=bb); L = pyogrio.read_dataframe(CADASTRE_DB, layer='lines', bbox=bb)
+    P = P.set_crs(2136, allow_override=True); L = L.set_crs(2136, allow_override=True)
+    Z = S.buffer(buffer_ft)
+    return P[P.intersects(Z)].reset_index(drop=True), L[L.intersects(Z)].reset_index(drop=True)
+class CadLines:
+    """the drawing's plot lines as 2-point segments, for the cut-placement bonus"""
+    def __init__(self, L):
+        import shapely
+        segs, dirs = [], []
+        for g in L.geometry:
+            for part in shapely.get_parts(g):
+                c = np.asarray(part.coords)[:, :2]
+                for a, b in zip(c[:-1], c[1:]):
+                    d = b - a; n_ = np.hypot(*d)
+                    if n_ > 2: segs.append(shapely.LineString([a, b])); dirs.append(d / n_)
+        self.segs = np.array(segs, dtype=object); self.dirs = np.array(dirs); self.tree = shapely.STRtree(self.segs) if segs else None
+    def __len__(self): return len(self.segs)
+    def bonus(self, ln):
+        """CAD_BONUS x length of drawing line running along `ln` (parallel, within CAD_SNAP_FT), weighted by closeness"""
+        import shapely
+        if self.tree is None or ln is None or ln.is_empty: return 0.0
+        parts = [p for p in shapely.get_parts(ln) if p.geom_type == 'LineString' and p.length > 1]
+        if not parts: return 0.0
+        p0 = max(parts, key=lambda p: p.length); c = np.asarray(p0.coords)[:, :2]; d = c[-1] - c[0]; d = d / (np.hypot(*d) + 1e-9)
+        z = ln.buffer(CAD_SNAP_FT); idx = self.tree.query(z, predicate='intersects')
+        if not len(idx): return 0.0
+        par = np.abs(self.dirs[idx] @ d) > 0.96; idx = idx[par]
+        if not len(idx): return 0.0
+        ov = shapely.length(shapely.intersection(self.segs[idx], z)); dist = shapely.distance(shapely.centroid(self.segs[idx]), ln)
+        return float(CAD_BONUS * np.sum(ov * np.clip(1 - dist / CAD_SNAP_FT, 0, 1)))
+def cadastre_snap_blocks(pieces, CP, iou_ok=0.6, share_ok=0.5, cover_ok=0.9, sliver_sqft=1500):
+    """pull whole blocks onto the drawing where our plots are already close to it: if >= share_ok of a block's plots overlap a drawing plot
+    by IoU >= iou_ok and the drawing covers >= cover_ok of the block, the block takes the drawing's plot lines (clipped to the block);
+    small leftovers join the neighbour with the longest shared edge. pieces: [(block_id, geometry)] -> same."""
+    import shapely
+    from shapely.ops import unary_union
+    tree = shapely.STRtree(CP.geometry.values); out = []; nb = 0
+    byb = {}
+    for bid, g in pieces: byb.setdefault(bid, []).append(g)
+    for bid, gs in byb.items():
+        blk = unary_union(gs).buffer(0.01).buffer(-0.01)
+        cand = [CP.geometry.iat[j] for j in tree.query(blk, predicate='intersects')]
+        C = [q for c in cand for q in shapely.get_parts(c.intersection(blk)) if q.geom_type == 'Polygon' and q.area > 200]
+        C = [c for c in C if c.area > 0.5 * max(cc.area for cc in cand if cc.intersects(c))]          # mostly inside this block
+        if not C or sum(c.area for c in C) < cover_ok * blk.area: out += [(bid, g) for g in gs]; continue
+        def iou(a, b): i = a.intersection(b).area; return i / (a.area + b.area - i)
+        ok = sum(1 for g in gs if max(iou(g, c) for c in C) >= iou_ok) / len(gs)
+        if ok < share_ok: out += [(bid, g) for g in gs]; continue
+        new = list(C)
+        for r in shapely.get_parts(blk.difference(unary_union(C))):
+            if r.geom_type != 'Polygon' or r.area < 1: continue
+            if r.area < sliver_sqft:
+                k = max(range(len(new)), key=lambda k: new[k].buffer(0.5).intersection(r).area)
+                if new[k].buffer(0.5).intersection(r).area > 0: new[k] = unary_union([new[k], r]).buffer(0.6).buffer(-0.6).intersection(blk); continue
+            new.append(r)
+        out += [(bid, q) for g in new for q in shapely.get_parts(g) if q.geom_type == 'Polygon' and q.area > 1]; nb += 1
+    print(f'   cadastral drawing: {nb} of {len(byb)} blocks take the plot lines of the drawing (our plots were already close to them)', flush=True)
+    return out
+def cadastre_register(CP, S, RS, max_ft=20):
+    """small shift (dx, dy ft) of the drawing onto the roads traced from the image: the drawing's plots should not lie on the road surface RS.
+    Kept only when it clearly helps (on-road share down by a third and by 0.5 points). Returns (dx, dy, share_before, share_after)."""
+    import shapely
+    from shapely import affinity
+    if not len(CP) or RS is None or RS.is_empty: return 0, 0, None, None
+    U = shapely.union_all(CP.geometry.values).buffer(0); RSs = RS.intersection(S.buffer(50))
+    def sc(dx, dy): u = affinity.translate(U, dx, dy).intersection(S); return u.intersection(RSs).area / max(u.area, 1)
+    g = min((sc(dx, dy), dx, dy) for dx in range(-max_ft, max_ft + 1, 4) for dy in range(-max_ft, max_ft + 1, 4))
+    g = min((sc(g[1] + dx, g[2] + dy), g[1] + dx, g[2] + dy) for dx in range(-3, 4) for dy in range(-3, 4) if abs(g[1] + dx) <= max_ft and abs(g[2] + dy) <= max_ft)
+    s0 = sc(0, 0)
+    if g[0] < s0 * 0.67 and s0 - g[0] > 0.005: return g[1], g[2], round(s0, 4), round(g[0], 4)
+    return 0, 0, round(s0, 4), round(s0, 4)
+def cadastre_compare(ctx, PL, B, S):
+    """every existing plot against the drawing: cad_id / cad_iou / cad_match (matches drawing >= 0.75 overlap, differs, not in drawing),
+    cad_flag where a drawing line crosses a building in the plot (the drawing line is kept: check on the ground).
+    Writes <P>Cadastre_plots.shp (reference), <P>Cadastre_conflicts.shp, <P>Cadastre_check.json. Returns PL with the new fields."""
+    import shapely
+    D, PFX = ctx['D'], ctx['PFX']
+    CP, CL = cadastre_load(S, 0)
+    dx, dy = ctx.get('cad_shift', (0, 0))
+    if dx or dy: CP['geometry'] = CP.geometry.translate(dx, dy); CL['geometry'] = CL.geometry.translate(dx, dy)
+    for nm in ('Cadastre_plots', 'Cadastre_conflicts'):
+        for ext in ('.shp', '.shx', '.dbf', '.prj', '.cpg'):
+            if os.path.exists(D + PFX + nm + ext): os.remove(D + PFX + nm + ext)
+    if not len(CP):
+        PL['cad_match'] = 'not in drawing'; PL['cad_id'] = 0; PL['cad_iou'] = 0.0; PL['cad_flag'] = ''
+        json.dump(dict(covered=False, plots=int(len(PL))), open(D + PFX + 'Cadastre_check.json', 'w'), indent=1); return PL
+    CPs = CP.copy(); CPs['geometry'] = CPs.intersection(S); CPs = CPs[~CPs.is_empty & (CPs.area > 200)]
+    CPs[['parcel_id', 'layer', 'area_ac', 'front_ft', 'depth_ft', 'geometry']].to_file(D + PFX + 'Cadastre_plots.shp')
+    tree = shapely.STRtree(CP.geometry.values); ids, ious, match = [], [], []
+    for g in PL.geometry:
+        k = tree.query(g, predicate='intersects'); best = (0.0, 0)
+        for j in k:
+            h = CP.geometry.iat[j]; i_ = g.intersection(h).area
+            if i_ <= 0: continue
+            u_ = i_ / (g.area + h.area - i_)
+            if u_ > best[0]: best = (u_, int(CP.parcel_id.iat[j]))
+        cov = sum(g.intersection(CP.geometry.iat[j]).area for j in k) / g.area if len(k) else 0
+        ids.append(best[1]); ious.append(round(best[0], 2))
+        match.append('matches drawing' if best[0] >= 0.75 else 'differs from drawing' if cov >= 0.5 else 'not in drawing')
+    PL['cad_id'] = ids; PL['cad_iou'] = ious; PL['cad_match'] = match
+    # drawing lines crossing buildings: kept (surveyed boundary), flagged for a check on the ground
+    Lin = CL[CL.intersects(S)]; conf = []
+    if len(Lin) and B is not None and len(B):
+        lt = shapely.STRtree(Lin.geometry.values)
+        for bg in B.geometry:
+            core = bg.buffer(-1.0)
+            if core.is_empty: continue
+            q = lt.query(core, predicate='intersects')
+            if len(q):
+                cl = float(sum(Lin.geometry.iat[j].intersection(core).length for j in q))
+                if cl > 3: conf.append((bg, round(cl, 1)))
+    PL['cad_flag'] = ''
+    if conf:
+        C = gpd.GeoDataFrame(dict(cut_ft=[c[1] for c in conf]), geometry=[c[0] for c in conf], crs=2136)
+        rp = C.geometry.representative_point(); C['plot_id'] = [next((pid for pid, g in zip(PL.plot_id, PL.geometry) if p.within(g)), '') for p in rp]
+        C['note'] = 'drawing plot line crosses this building: line kept, check on the ground'; C.to_file(D + PFX + 'Cadastre_conflicts.shp')
+        fl = set(C.plot_id); PL['cad_flag'] = ['drawing line crosses a building - check' if p in fl else '' for p in PL.plot_id]
+    vc = PL.cad_match.value_counts().to_dict()
+    summ = dict(covered=True, plots=int(len(PL)), drawing_plots_in_site=int(len(CPs)), matches=int(vc.get('matches drawing', 0)), differs=int(vc.get('differs from drawing', 0)),
+                not_in_drawing=int(vc.get('not in drawing', 0)), buildings_crossed=len(conf), plots_flagged=int((PL.cad_flag != '').sum()),
+                drawing_cover_pct=round(float(CPs.area.sum() / S.area * 100), 1), layers=sorted(CPs.layer.unique().tolist()),
+                shift_ft=[dx, dy], on_road_before=ctx.get('cad_onroad', [None, None])[0], on_road_after=ctx.get('cad_onroad', [None, None])[1])
+    json.dump(summ, open(D + PFX + 'Cadastre_check.json', 'w'), indent=1)
+    print(f"   cadastral drawing: {summ['drawing_plots_in_site']} surveyed plots in the site ({summ['drawing_cover_pct']}% of it) | our plots: {summ['matches']} match, "
+          f"{summ['differs']} differ, {summ['not_in_drawing']} not in the drawing | {summ['buildings_crossed']} buildings crossed by a drawing line ({summ['plots_flagged']} plots flagged)", flush=True)
+    return PL
+
 
 GUIDE = r"""# LP Toolkit: local plan preparation guide
 
@@ -1114,6 +1257,7 @@ The automatic road layout (option 2) keeps existing roads on their alignment and
 | Satellite imagery (contextily, zoom 19): Google satellite by default (user choice 2026-11-17, Esri kept dropping connections), Esri World Imagery as the fallback (`--imagery esri` to prefer Esri) | Digitizing, checks, map backgrounds | 0.3 m/px at 5.5 N; 8 retries per tile, then a slow single-connection pass, then the other source. Google's terms allow its imagery only through official Google tools: fine for internal planning, use Esri or licensed imagery for published maps. The digitizing colour rules were calibrated on Esri (green cast): check the first Google runs against the building database |
 | **Building database** `D:/Work/2026/Data` | Footprints, occupancy, storey height | One GeoPackage per level-6 quadkey tile, layer `building`, EPSG:4326, ODbL. Tiles on disk: 033331, 033333 (Accra / south-east, 4.1 M buildings), 122220. Fields: id, occupancy (GEM taxonomy), height (`HBET:1-5` = 1 to 5 storeys), floorspace (rare), source_id (0 OSM, 1 Google Open Buildings, 2 Microsoft). Occupancy is good where OSM is rich (Osu 78% known), almost all UNK in indigenous cores (La). The `Ghana buildings.gdb` beside it is an empty ArcGIS project geodatabase |
 | OSM via Overpass | Roads (with names and class), POI tags, buildings | Overpass servers are often overloaded (502/504). The toolkit tries overpass-api.de, kumi, private.coffee, mail.ru, then falls back to the main OSM API `/api/0.6/map?bbox=` (works for sites up to about 0.25 sq deg / 50,000 nodes) |
+| **Cadastral plots database** `D:/Work/2026/Data/cadastre_accra.gpkg` | Surveyed plot boundaries for existing-area demarcation (section 4, step 8) | From `D:/Work/2026/Data/COLLESUA NEW 1/COLLESUA NEW 1.dwg` (AutoCAD 2007, no CRS stored; Ghana National Grid ft, EPSG:2136), exported with ArcGIS Pro; plot layers 0LOT, 0LOT1, 0DIST01-04, 0FOB, 0FOBIL, 0SEC204, 0CHRIS noded and polygonised, duplicates between layers dropped. Layers `parcels` (181,934: parcel_id, layer, area_ac, front_ft, depth_ft; median 0.19 ac), `lines` (651,316), `labels` (sections, place names, survey numbers). Greater Accra only. Loader `cadastre_load()` |
 | **Rivers database** `D:/Work/2026/Data/rivers_africa.gpkg` | Rivers, streams, canals, drains and ditches in and near the site (site analysis, green reserve in the road design) | OpenStreetMap waterways for Africa, 1,329,371 lines, from `D:/Work/2026/Data/Rivers_ Africa/Rivers.shp` (1.1 GB, converted once to an R-tree indexed GeoPackage, layer `rivers`, EPSG:4326, about 0.02 s per site). Fields: osm_id, name, waterway, intermittent, seasonal, tunnel, width. Loader `rivers_load()`, check `river_check()` |
 | Microsoft Global ML Building Footprints | Reference footprints | `dataset-links.csv` + level-9 quadkey tile (Accra = 033333111); cached in `LP_Toolkit/cache/ms` |
 | Copernicus DEM 30 m (AWS) | Terrain, slope, drainage, facility siting | `https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N05_00_W001_00_DEM/...` (tile by integer lat/lon) |
@@ -1150,6 +1294,12 @@ How the toolkit applies it:
 5. Block ends: oversized end wedges are re-cut square to the side street they run along (plots facing the side street).
 6. Any plot still deeper than the profile maximum is halved again at the line of least building cut, never through a large (> 500 m2, image-confirmed) building. Back plots with no road are flagged `Interior (access lane not mapped - verify)`; plots on the site boundary are `Site edge (road outside site)`.
 7. Plot use = the plot's most specific tagged building (OSM tag / database occupancy), else its largest building.
+8. **Cadastral drawing (2026-11-25, existing areas only).** Where the site lies in the cadastral plots database (`D:/Work/2026/Data/cadastre_accra.gpkg`, 181,934 surveyed plots of Greater Accra from `COLLESUA NEW 1.dwg`), the drawing is combined with steps 2-6 (user's choice: guide the cuts and compare, not replace):
+   - Registration: the drawing is moved by at most 20 ft when that clearly takes its plots off the road surface traced from the image (on-road share down by a third); the shift is reported. Measured: within about 10 ft of the image everywhere tested (Ben 1 none, baku test +5 E / -13 N).
+   - Pull: every candidate line (row line, plot cut, halving line) running along a parallel drawing line within 4 ft gets a bonus of 3 per foot followed, larger than the building cut cost, so the surveyed line wins even where it crosses a building (user: flag, keep the drawing).
+   - Whole blocks: where at least half of a block's plots already overlap a drawing plot (IoU >= 0.6) and the drawing covers 90% of the block, the block takes the drawing's exact plot lines; slivers under 1,500 sq ft join the neighbour.
+   - Compare: every plot gets `cad_match` (matches drawing: IoU >= 0.75 / differs from drawing / not in drawing), `cad_iou`, `cad_id` (parcel_id in the database) and `cad_flag` ("drawing line crosses a building - check"). Outputs `<P>Cadastre_plots.shp` (reference layer), `<P>Cadastre_conflicts.shp` (buildings crossed), `<P>Cadastre_check.json`; web app: Results > "Cadastral drawing" card and two map layers.
+   - Test: Ben 1 matches 43 -> 125 of 258 plots; baku test 13 -> 33 of 163 (there the ground plots are mostly half drawing plots, 15 m frontage, so they rightly stay "differs"). `--no-cadastre` switches it off.
 
 Profiles (chosen automatically from the median size of image-digitized buildings, threshold 70 m2, or set with `--profile`):
 
@@ -3285,10 +3435,23 @@ def st_plots(ctx):
     REDO = [int(x) for x in (ctx.get('redo_blocks') or [])]
     if REDO: BLK = BLK[BLK.block_id.isin(REDO)].reset_index(drop=True); print(f'   re-demarcating blocks {REDO}', flush=True)
     WT = shapely.STRtree(list(W.geometry)) if len(W) else None
+    # cadastral drawing (user 2026-11-25): plot lines are pulled onto the surveyed lines where the drawing covers the site
+    SITE_S = shapely.force_2d(gpd.read_file(SITE_KML).to_crs(2136).union_all())
+    CAD = None
+    if ctx.get('cadastre', True):
+        try:
+            _cp, _cl = cadastre_load(SITE_S)
+            if len(_cl):
+                _rs = gpd.read_file(D + PFX + 'Road_surface.shp').union_all() if os.path.exists(D + PFX + 'Road_surface.shp') else None
+                dx_, dy_, s0_, s1_ = cadastre_register(_cp, SITE_S, _rs); ctx['cad_shift'] = (dx_, dy_); ctx['cad_onroad'] = [s0_, s1_]
+                if dx_ or dy_: _cl['geometry'] = _cl.geometry.translate(dx_, dy_); print(f'   cadastral drawing shifted {dx_:+d} ft E, {dy_:+d} ft N onto the traced roads (plots on the road surface {s0_:.1%} -> {s1_:.1%})', flush=True)
+                CAD = CadLines(_cl); print(f'   cadastral drawing: {len(_cp)} surveyed plots / {len(CAD)} line pieces around the site: cuts follow them', flush=True)
+        except Exception as ex: print('   cadastral drawing not used:', str(ex)[:120], flush=True)
+    cadb = (lambda ln: CAD.bonus(ln)) if CAD is not None else (lambda ln: 0.0)
     def split_cost(ln, BUb, off):
         """cost of a rear (row) line: building length it cuts, minus walls / fences running along it (seen on the image), mild pull to the middle"""
         if ctx.get('split') == 'middle': return abs(off)
-        c = (ln.intersection(BUb).length if BUb is not None else 0) + abs(off) * 0.05
+        c = (ln.intersection(BUb).length if BUb is not None else 0) + abs(off) * 0.05 - cadb(ln)
         if WT is not None and not ln.is_empty:
             z = ln.buffer(1.5 / FT); parts = [g for g in shapely.get_parts(ln) if g.geom_type == 'LineString']
             if parts:
@@ -3314,6 +3477,7 @@ def st_plots(ctx):
             ln = LineString([tuple(o + u * s - n * 2000), tuple(o + u * s + n * 2000)]).intersection(row)
             c = ln.intersection(BU).length if (BU is not None and not ln.is_empty) else 0.0
             if any(abs(w - s) < 1.5 / FT for w in walls): c -= 15
+            c -= cadb(ln)
             cost.append(c)
         cost = np.array(cost)
         def pen(w):
@@ -3357,7 +3521,7 @@ def st_plots(ctx):
             return LineString([tuple(p - nn * 3), tuple(p + nn * 400)])
         cost = []
         for s in S:
-            ln = cutline(s).intersection(row); c = ln.intersection(BU).length if (BU is not None and not ln.is_empty) else 0.0
+            ln = cutline(s).intersection(row); c = (ln.intersection(BU).length if (BU is not None and not ln.is_empty) else 0.0) - cadb(ln)
             if any(ln.distance(w) < 1.5 / FT and abs(float(unit(np.subtract(w.coords[-1], w.coords[0])[:2]) @ tang(F, s))) < 0.35 for w in wl): c -= 15
             cost.append(c)
         cost = np.array(cost)
@@ -3529,12 +3693,13 @@ def st_plots(ctx):
         bl = [b for b in BU_all if b.intersects(g)]; BU = unary_union(bl) if bl else None; best = (1e18, 0.0)
         for off in np.arange(-0.2 * dep, 0.2 * dep + 1, 1 / FT):
             ln = LineString([tuple(c + ul * off - nl * 3000), tuple(c + ul * off + nl * 3000)]).intersection(g)
-            cst = (ln.intersection(BU).length if BU is not None else 0) + abs(off) * 0.05 + (1e6 if BIG is not None and ln.intersects(BIG) else 0)
+            cst = (ln.intersection(BU).length if BU is not None else 0) + abs(off) * 0.05 + (1e6 if BIG is not None and ln.intersects(BIG) else 0) - cadb(ln)
             if cst < best[0]: best = (cst, off)
         if best[0] >= 1e6: return [(bid, g)]
         parts = [x for x in shapely.get_parts(split(g, LineString([tuple(c + ul * best[1] - nl * 3000), tuple(c + ul * best[1] + nl * 3000)]))) if x.area * FT * FT > 10]
         return [y for x in parts for y in halve_deep(bid, x, depth_max)] if len(parts) > 1 else [(bid, g)]
     n0 = len(pieces); pieces = [x for bid, g in pieces for x in halve_deep(bid, g)]; print('halve deep: pieces', n0, '->', len(pieces))
+    if CAD is not None and len(_cp): pieces = cadastre_snap_blocks(pieces, _cp.assign(geometry=_cp.geometry.translate(*ctx.get('cad_shift', (0, 0)))))
     pieces += [(sp[0], sp[1]) for sp in SITE_PIECES]
     PL = gpd.GeoDataFrame(dict(block_id=[p[0] for p in pieces]), geometry=[p[1] for p in pieces], crs=2136)
     # pieces with no building and small, or corner triangles: join the neighbour sharing the longest edge
@@ -3588,6 +3753,11 @@ def st_plots(ctx):
     PL['frontage_m'] = [round(min(math.dist(c[0], c[1]), math.dist(c[1], c[2])) * FT, 1) for c in qq]; PL['depth_m'] = [round(max(math.dist(c[0], c[1]), math.dist(c[1], c[2])) * FT, 1) for c in qq]
     PL['coverage'] = [round(B[B.representative_point().within(g)].area.sum() / g.area, 2) for g in PL.geometry]
     PL = PL[['plot_id', 'block_id', 'access', 'ex_use', 'use_conf', 'use_guess', 'n_bld', 'main_bld', 'area_m2', 'frontage_m', 'depth_m', 'coverage', 'geometry']]; save_plots(PL); TB_GDF.to_file(D + PFX + 'Tree_belt_existing.shp')
+    if ctx.get('cadastre', True):                                                # compare the whole plot file with the drawing (also after a block re-run)
+        try:
+            ALL = gpd.read_file(D + PFX + 'Plots_existing.shp'); ALL = cadastre_compare(ctx, ALL.drop(columns=[c_ for c_ in ('cad_id', 'cad_iou', 'cad_match', 'cad_flag') if c_ in ALL]), B, SITE_S)
+            ALL.to_file(D + PFX + 'Plots_existing.shp')
+        except Exception as ex: print('   cadastral comparison failed:', str(ex)[:160], flush=True)
     ov = gpd.overlay(PL[['plot_id', 'geometry']], PL[['plot_id', 'geometry']], how='intersection'); ov = ov[ov.plot_id_1 != ov.plot_id_2]
     cut = sum(1 for g in B.geometry if g.area * FT * FT > 25 and PL.intersects(g).sum() > 1 and PL[PL.intersects(g)].intersection(g).area.max() < 0.85 * g.area)
     print(f'plots {len(PL)} | median {PL.area_m2.median():.0f} m2 ({PL.frontage_m.median():.1f} x {PL.depth_m.median():.1f} m) | blocks covered {(PL.area.sum() + TB_GDF.area.sum()) / BLK.area.sum() * 100:.1f}% | overlap {ov.area.sum() * FT * FT / 2:.0f} m2 | buildings cut by plot lines {cut} of {len(B)}')
@@ -5323,7 +5493,7 @@ def make_ctx(a, workflow):
     work = out + '_work/'; os.makedirs(work, exist_ok=True); os.makedirs(work + 'tiles', exist_ok=True)
     ctx = dict(D=out, WORK=work, PFX=re.sub(r'\W+', '', name) + '_', SITE_KML=site, SAM_CKPT=SAM_CKPT_DEFAULT, NAME=name,
                TITLE=a.title or name, buildings=getattr(a, 'buildings', 'fast'), redo_blocks=[x for x in (getattr(a, 'blocks', None) or '').split(',') if x.strip()], rows=getattr(a, 'rows', 'auto'), wmin_m=getattr(a, 'wmin', None), wmax_m=getattr(a, 'wmax', None), split=getattr(a, 'split', 'evidence'), profile=getattr(a, 'profile', 'auto'), roads=getattr(a, 'roads', None), existing=getattr(a, 'existing', None), stream=getattr(a, 'stream', None),
-               stream_buffer=getattr(a, 'stream_buffer', 0), steep_pct=getattr(a, 'steep_pct', 30), pattern=getattr(a, 'pattern', None), lock=getattr(a, 'lock', None), zones=getattr(a, 'zones', None), only_zones=getattr(a, 'only_zones', False), chamfer=bool(getattr(a, 'chamfer', False)), band=getattr(a, 'band', None), block_len=getattr(a, 'block_len', None), plot_w=getattr(a, 'plot_w', None), plot_l=getattr(a, 'plot_l', None), local_width=getattr(a, 'local_width', None), collector_width=getattr(a, 'collector_width', None), max_parcel_ac=getattr(a, 'max_parcel_ac', None), fp_min_w=0.6, fp_thr=0.0, workflow=workflow)
+               stream_buffer=getattr(a, 'stream_buffer', 0), cadastre=not getattr(a, 'no_cadastre', False), steep_pct=getattr(a, 'steep_pct', 30), pattern=getattr(a, 'pattern', None), lock=getattr(a, 'lock', None), zones=getattr(a, 'zones', None), only_zones=getattr(a, 'only_zones', False), chamfer=bool(getattr(a, 'chamfer', False)), band=getattr(a, 'band', None), block_len=getattr(a, 'block_len', None), plot_w=getattr(a, 'plot_w', None), plot_l=getattr(a, 'plot_l', None), local_width=getattr(a, 'local_width', None), collector_width=getattr(a, 'collector_width', None), max_parcel_ac=getattr(a, 'max_parcel_ac', None), fp_min_w=0.6, fp_thr=0.0, workflow=workflow)
     ctx['facilities'] = getattr(a, 'facilities', None); ctx['facility_sites'] = getattr(a, 'facility_sites', None)
     json.dump({k: v for k, v in ctx.items()}, open(work + 'run.json', 'w'), indent=1)
     return ctx
@@ -5348,6 +5518,7 @@ def main():
         p.add_argument('--imagery', choices=['google', 'esri'], default='google', help='satellite imagery source (the other one is the fallback)')
         if c == 'existing':
             p.add_argument('--profile', default='auto', choices=['auto', 'planned', 'compact']); p.add_argument('--with', dest='with_', default='')
+            p.add_argument('--no-cadastre', action='store_true', help='existing plots: do not use the cadastral plots database (D:/Work/2026/Data/cadastre_accra.gpkg)')
             p.add_argument('--buildings', choices=['fast', 'full'], default='fast', help='fast: OSM + building database (minutes); full: + image detection with SAM (hours)')
             p.add_argument('--blocks', help='re-demarcate only these block ids (comma list) with --only plots,map')
             p.add_argument('--rows', choices=['auto', '1', '2'], default='auto'); p.add_argument('--wmin', type=float, help='min plot frontage m'); p.add_argument('--wmax', type=float, help='max plot frontage m')

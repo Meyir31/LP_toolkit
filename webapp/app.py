@@ -153,6 +153,11 @@ def terrain(pid):
     rv = os.path.join(outdir(pid), prefix(pid) + 'Rivers_check.json')                 # rivers database check (site analysis)
     if t and os.path.exists(rv): t['rivers'] = json.load(open(rv))
     return jsonify(t)
+@app.get('/api/projects/<pid>/cadastre')
+def cadastre(pid):
+    """comparison of the existing plots with the cadastral drawing (plots stage)"""
+    f = os.path.join(outdir(pid), prefix(pid) + 'Cadastre_check.json')
+    return jsonify(json.load(open(f)) if os.path.exists(f) else {})
 @app.get('/api/projects/<pid>/patterns')
 def patterns(pid):
     f = os.path.join(outdir(pid), prefix(pid) + 'Roads_patterns.json')
@@ -370,7 +375,7 @@ def plots_undo(pid):
     gpd.read_file(hs[-1]).to_file(plots_file(pid)); os.remove(hs[-1]); return jsonify(ok=True, left=len(hs) - 1)
 # ------------------------------------------------------------------ generic feature editing (all result layers)
 EDITABLE = {
-    'existing': [('Plots / land use', '{O}/{P}Plots_existing.shp'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp'), ('Blocks', '{O}/{P}Blocks_existing.shp'),
+    'existing': [('Plots / land use', '{O}/{P}Plots_existing.shp'), ('Cadastral plots (survey drawing)', '{O}/{P}Cadastre_plots.shp'), ('Buildings crossed by a surveyed plot line', '{O}/{P}Cadastre_conflicts.shp'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp'), ('Blocks', '{O}/{P}Blocks_existing.shp'),
                  ('Road surface', '{O}/{P}Road_surface.shp'), ('Road centrelines', '{O}/{P}Roads_existing.shp'), ('Walls / fences', '{O}/{P}Walls_final.shp'),
                  ('Vacant / open land', '{O}/{P}Vacant_open_land.shp'), ('Tree belt', '{O}/{P}Tree_belt_existing.shp'), ('Pinch points', '{O}/{P}Road_pinch_points.shp'), ('Streams / rivers / water', 'stream.geojson'), ('Site boundary', 'site.geojson')],
     'design': [('Roads (design)', 'roads.geojson'), ('Plots and land use', '{O}/_work/plots_landuse.gpkg'), ('Plots (before land use)', '{O}/_work/plots_final.gpkg'),
@@ -857,7 +862,8 @@ def status(pid):
 
 # ------------------------------------------------------------------ results
 LAYERS = {   # (label, relative path template, kind)
-    'existing': [('Plots (existing land use)', '{O}/{P}Plots_existing.shp', 'plots'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp', 'buildings'),
+    'existing': [('Plots (existing land use)', '{O}/{P}Plots_existing.shp', 'plots'), ('Cadastral plots (survey drawing)', '{O}/{P}Cadastre_plots.shp', 'cadastre'),
+                 ('Buildings crossed by a surveyed plot line', '{O}/{P}Cadastre_conflicts.shp', 'cadconf'), ('Buildings', '{O}/{P}Existing_land_use_buildings.shp', 'buildings'),
                  ('Blocks', '{O}/{P}Blocks_existing.shp', 'blocks'), ('Road surface', '{O}/{P}Road_surface.shp', 'roads'),
                  ('Walls / fences', '{O}/{P}Walls_final.shp', 'walls'), ('Pinch points', '{O}/{P}Road_pinch_points.shp', 'points'),
                  ('Tree belt', '{O}/{P}Tree_belt_existing.shp', 'green'), ('Road centrelines (with widths)', '{O}/{P}Roads_existing.shp', 'lines'),
